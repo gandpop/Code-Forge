@@ -10,7 +10,7 @@ namespace CodeForge.Combat
     {
         [Header("Runtime Script Configuration")]
         public int attacksPerTurn = 1;
-        public float attackDamage = 10f;
+        public float attackDamage = 5f;
         public float damageMultiplier = 1.0f;
         public bool isPiercing = false;
         public TargetPriority targetingPriority = TargetPriority.LowestHealth;
