@@ -13,6 +13,8 @@ namespace CodeForge.UI
 
         [SerializeField] private TextMeshProUGUI cardText;
         [SerializeField] private Image cardBackground;
+        [SerializeField] private Image rarityBorder;
+        [SerializeField] private Outline cardOutline;
         [SerializeField] private CanvasGroup canvasGroup;
 
         private Transform originalParent;
@@ -37,6 +39,9 @@ namespace CodeForge.UI
         {
             if (Token == null) return;
 
+            string rarityHex = Token.GetRarityHexColor();
+            Color rarityColor = Token.GetRarityColor();
+
             if (cardText != null)
             {
                 string typeColor = Token.tokenType switch
@@ -57,19 +62,30 @@ namespace CodeForge.UI
                     _ => "var"
                 };
 
-                cardText.text = $"<color={typeColor}><b>{typeName}</b></color>\n<size=115%>{Token.GetFormattedCodeString()}</size>";
+                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=115%><b>{Token.GetFormattedCodeString()}</b></size>";
+            }
+
+            if (rarityBorder != null)
+            {
+                rarityBorder.color = rarityColor;
+            }
+
+            if (cardOutline == null) cardOutline = GetComponent<Outline>();
+            if (cardOutline != null)
+            {
+                cardOutline.effectColor = new Color(rarityColor.r, rarityColor.g, rarityColor.b, 0.9f);
+                cardOutline.effectDistance = new Vector2(2f, -2f);
             }
 
             if (cardBackground != null)
             {
-                cardBackground.color = Token.tokenType switch
-                {
-                    CodeTokenType.Float => new Color(0.16f, 0.22f, 0.28f, 1f),
-                    CodeTokenType.Int => new Color(0.18f, 0.20f, 0.28f, 1f),
-                    CodeTokenType.Bool => new Color(0.24f, 0.18f, 0.28f, 1f),
-                    CodeTokenType.TargetPriority => new Color(0.16f, 0.26f, 0.24f, 1f),
-                    _ => new Color(0.20f, 0.20f, 0.25f, 1f)
-                };
+                // Dark base tinted with subtle rarity tone
+                cardBackground.color = new Color(
+                    0.12f + rarityColor.r * 0.12f,
+                    0.12f + rarityColor.g * 0.12f,
+                    0.16f + rarityColor.b * 0.12f,
+                    1f
+                );
             }
         }
 

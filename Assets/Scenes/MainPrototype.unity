@@ -1524,16 +1524,16 @@ MonoBehaviour:
   - {fileID: 11400000, guid: a65a75c905ba14a47af56475db0a9152, type: 2}
   - {fileID: 11400000, guid: 1684da19d90408f4fa7dfd3cb55be2fa, type: 2}
   - {fileID: 11400000, guid: c6a595573d566d848abb02476c88035b, type: 2}
-  - {fileID: 11400000, guid: 09ef4087d7aa1304997061e0288a62ab, type: 2}
   - {fileID: 11400000, guid: a941d4a7bc6b38f4085b8408e8271865, type: 2}
-  - {fileID: 11400000, guid: 277efbf239b30314fbb9383163bc0abb, type: 2}
-  - {fileID: 11400000, guid: cb01dbf57848ca646be128fac61c681f, type: 2}
   - {fileID: 11400000, guid: e86c296d4d0cde24ca30c7295cecd08c, type: 2}
-  - {fileID: 11400000, guid: 87524b299ce47c448883de9ac81f7f2c, type: 2}
   - {fileID: 11400000, guid: 7559a11a821cd5846b402becd6b3b88a, type: 2}
   - {fileID: 11400000, guid: 00b93eb0b2c275344a0b9cc71f6e0d3c, type: 2}
-  - {fileID: 11400000, guid: 6ba11f7562bb1104da0dbe2daf7bb9bd, type: 2}
   codeEditorUI: {fileID: 767695601}
+  commonChance: 100
+  uncommonChance: 60
+  rareChance: 30
+  epicChance: 15
+  legendaryChance: 5
 --- !u!224 &454736872
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2839,13 +2839,7 @@ MonoBehaviour:
   panelCanvasGroup: {fileID: 767695598}
   starterTokens:
   - {fileID: 11400000, guid: 4b9c6f50a466ff34ebb8cd80d0261403, type: 2}
-  - {fileID: 11400000, guid: c7c17a9298c26c046b51a1ce4a9173f2, type: 2}
-  - {fileID: 11400000, guid: ffd239bc4a261d0489c6ee6b2b953468, type: 2}
-  - {fileID: 11400000, guid: 55d1c542206ecf041ac2c528adbc0c76, type: 2}
-  - {fileID: 11400000, guid: 64d7351f0f70cde4fa3bd42753948739, type: 2}
   - {fileID: 11400000, guid: 4d3f4919488213949a7326746314caf1, type: 2}
-  - {fileID: 11400000, guid: 00b93eb0b2c275344a0b9cc71f6e0d3c, type: 2}
-  - {fileID: 11400000, guid: 7559a11a821cd5846b402becd6b3b88a, type: 2}
 --- !u!1 &784814194
 GameObject:
   m_ObjectHideFlags: 0
@@ -5544,7 +5538,7 @@ MonoBehaviour:
   socketRole: 1
   expectedType: 1
   defaultFloat: 0
-  defaultInt: 10
+  defaultInt: 5
   defaultBool: 0
   defaultTargetPriority: 0
   socketValueText: {fileID: 1443640207}
