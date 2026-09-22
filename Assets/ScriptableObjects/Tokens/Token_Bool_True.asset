@@ -10,11 +10,11 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 09d591d0ac51e54428253619756b96c9, type: 3}
-  m_Name: Token_Target_HighestHP
+  m_Name: Token_Bool_True
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
-  tokenName: HighestHealth
-  tokenType: 3
+  tokenName: bool true
+  tokenType: 2
   floatValue: 0
   intValue: 0
-  boolValue: 0
-  targetPriorityValue: 1
+  boolValue: 1
+  targetPriorityValue: 0

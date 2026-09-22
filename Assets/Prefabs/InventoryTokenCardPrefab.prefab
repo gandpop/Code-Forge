@@ -150,6 +150,8 @@ GameObject:
   - component: {fileID: 4765069512084884855}
   - component: {fileID: 4331870955735994450}
   - component: {fileID: 2087318515494462845}
+  - component: {fileID: 7900939136451914745}
+  - component: {fileID: 2540740188153707536}
   m_Layer: 0
   m_Name: InventoryTokenCardPrefab
   m_TagString: Untagged
@@ -279,3 +281,30 @@ MonoBehaviour:
   m_FlexibleWidth: -1
   m_FlexibleHeight: -1
   m_LayoutPriority: 1
+--- !u!225 &7900939136451914745
+CanvasGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8633752197022535406}
+  m_Enabled: 1
+  m_Alpha: 1
+  m_Interactable: 1
+  m_BlocksRaycasts: 1
+  m_IgnoreParentGroups: 0
+--- !u!114 &2540740188153707536
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8633752197022535406}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cdab925c60adc024088b99b99b877e5a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CodeForge.UI.DraggableTokenCardUI
+  cardText: {fileID: 589339656084209193}
+  cardBackground: {fileID: 4765069512084884855}
+  canvasGroup: {fileID: 7900939136451914745}

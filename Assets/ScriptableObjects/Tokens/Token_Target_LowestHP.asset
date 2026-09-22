@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09d591d0ac51e54428253619756b96c9, type: 3}
   m_Name: Token_Target_LowestHP
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
-  tokenName: Target_LowestHP
+  tokenName: LowestHealth
   tokenType: 3
   floatValue: 0
   intValue: 0

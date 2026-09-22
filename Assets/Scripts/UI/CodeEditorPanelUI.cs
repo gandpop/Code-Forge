@@ -25,8 +25,6 @@ namespace CodeForge.UI
         [Header("Starter Loadout")]
         [SerializeField] private List<CodeTokenSO> starterTokens = new List<CodeTokenSO>();
 
-        private List<CodeTokenSO> playerInventory = new List<CodeTokenSO>();
-
         private void Awake()
         {
             if (compileAndRunButton != null)
@@ -39,6 +37,13 @@ namespace CodeForge.UI
                     }
                 });
             }
+
+            // Ensure sockets have back-reference to this editor panel
+            if (attacksSocket != null) attacksSocket.SetEditorReference(this);
+            if (damageSocket != null) damageSocket.SetEditorReference(this);
+            if (multiplierSocket != null) multiplierSocket.SetEditorReference(this);
+            if (piercingSocket != null) piercingSocket.SetEditorReference(this);
+            if (targetingSocket != null) targetingSocket.SetEditorReference(this);
         }
 
         private void Start()
@@ -66,21 +71,23 @@ namespace CodeForge.UI
 
         public void AddTokenToInventory(CodeTokenSO token)
         {
-            if (token == null) return;
-            playerInventory.Add(token);
-            if (inventoryTokenCardPrefab != null && tokenInventoryContainer != null)
+            if (token == null || inventoryTokenCardPrefab == null || tokenInventoryContainer == null) return;
+
+            GameObject cardObj = Instantiate(inventoryTokenCardPrefab, tokenInventoryContainer);
+            cardObj.name = $"Card_{token.name}";
+
+            var draggable = cardObj.GetComponent<DraggableTokenCardUI>();
+            if (draggable != null)
             {
-                GameObject cardObj = Instantiate(inventoryTokenCardPrefab, tokenInventoryContainer);
+                draggable.BindToken(token);
+            }
+            else
+            {
+                // Fallback for simple button/text
                 var text = cardObj.GetComponentInChildren<TextMeshProUGUI>();
                 if (text != null)
                 {
                     text.text = $"{token.tokenName}\n<size=80%>{token.GetFormattedCodeString()}</size>";
-                }
-
-                Button btn = cardObj.GetComponent<Button>();
-                if (btn != null)
-                {
-                    btn.onClick.AddListener(() => AutoAssignToken(token));
                 }
             }
         }
@@ -94,14 +101,11 @@ namespace CodeForge.UI
                     if (multiplierSocket != null) multiplierSocket.AssignToken(token);
                     break;
                 case CodeTokenType.Int:
-                    if (token.tokenName.ToLower().Contains("turn") || token.tokenName.ToLower().Contains("attacks"))
-                    {
-                        if (attacksSocket != null) attacksSocket.AssignToken(token);
-                    }
-                    else
-                    {
-                        if (damageSocket != null) damageSocket.AssignToken(token);
-                    }
+                    // If attacks socket is default, slot attacks, else damage
+                    if (attacksSocket != null && attacksSocket.AssignedToken == null)
+                        attacksSocket.AssignToken(token);
+                    else if (damageSocket != null)
+                        damageSocket.AssignToken(token);
                     break;
                 case CodeTokenType.Bool:
                     if (piercingSocket != null) piercingSocket.AssignToken(token);
