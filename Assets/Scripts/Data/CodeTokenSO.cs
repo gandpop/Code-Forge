@@ -7,6 +7,12 @@ namespace CodeForge.Data
     {
         public string tokenName;
         public CodeTokenType tokenType;
+        [TextArea(1, 3)]
+        public string codeDisplaySyntax;
+
+        [Header("Numeric Values (for Float / Int tokens)")]
+        public float floatValue = 1.0f;
+        public int intValue = 0;
 
         [Header("Rarity Settings (Spawn chance is linked to Rarity)")]
         public TokenRarity rarity = TokenRarity.Common;
@@ -16,12 +22,6 @@ namespace CodeForge.Data
         [Tooltip("Leave false to automatically use the rarity's spawn chance. Enable to set a custom chance score.")]
         public bool overrideSpawnChance = false;
         [Range(0f, 100f)] public float customSpawnChance = 100f;
-
-        [Header("Values (Populate based on TokenType)")]
-        public float floatValue;
-        public int intValue;
-        public bool boolValue;
-        public TargetPriority targetPriorityValue;
 
         /// <summary>
         /// Spawn chance linked directly to rarity, unless overridden or disabled.
@@ -69,16 +69,21 @@ namespace CodeForge.Data
             };
         }
 
-        public string GetFormattedCodeString()
+        public virtual string GetFormattedCodeString()
         {
-            return tokenType switch
+            if (!string.IsNullOrEmpty(codeDisplaySyntax))
             {
-                CodeTokenType.Float => $"{floatValue:0.0}f",
-                CodeTokenType.Int => $"{intValue}",
-                CodeTokenType.Bool => boolValue ? "true" : "false",
-                CodeTokenType.TargetPriority => $"TargetPriority.{targetPriorityValue}",
-                _ => "null"
-            };
+                return codeDisplaySyntax;
+            }
+            if (tokenType == CodeTokenType.Float)
+            {
+                return $"{floatValue:0.##}f";
+            }
+            if (tokenType == CodeTokenType.Int)
+            {
+                return $"{intValue}";
+            }
+            return tokenName ?? name;
         }
     }
 }

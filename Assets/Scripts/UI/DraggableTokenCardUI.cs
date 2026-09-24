@@ -46,23 +46,21 @@ namespace CodeForge.UI
             {
                 string typeColor = Token.tokenType switch
                 {
-                    CodeTokenType.Float => "#569CD6",
-                    CodeTokenType.Int => "#569CD6",
-                    CodeTokenType.Bool => "#569CD6",
-                    CodeTokenType.TargetPriority => "#4EC9B0",
+                    CodeTokenType.Targeting => "#4EC9B0", // Teal
+                    CodeTokenType.Condition => "#DCDCAA", // Yellowish / Expression
+                    CodeTokenType.Action => "#C586C0",    // Purple / Action
                     _ => "#D4D4D4"
                 };
 
                 string typeName = Token.tokenType switch
                 {
-                    CodeTokenType.Float => "float",
-                    CodeTokenType.Int => "int",
-                    CodeTokenType.Bool => "bool",
-                    CodeTokenType.TargetPriority => "enum",
+                    CodeTokenType.Targeting => "target",
+                    CodeTokenType.Condition => "condition",
+                    CodeTokenType.Action => "action",
                     _ => "var"
                 };
 
-                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=115%><b>{Token.GetFormattedCodeString()}</b></size>";
+                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=110%><b>{Token.GetFormattedCodeString()}</b></size>";
             }
 
             if (rarityBorder != null)

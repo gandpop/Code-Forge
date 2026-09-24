@@ -46,6 +46,11 @@ namespace CodeForge.UI
 
         public void ShowRewardPrompt()
         {
+            ShowRewardPrompt(1);
+        }
+
+        public void ShowRewardPrompt(int roomIndex)
+        {
             if (rootContainer != null) rootContainer.SetActive(true);
             if (rewardButtonsContainer != null)
             {
@@ -67,11 +72,39 @@ namespace CodeForge.UI
 
             if (eligibleTokens.Count == 0) return;
 
-            // Weighted random selection of up to 3 unique tokens
-            int countToDraft = Mathf.Min(3, eligibleTokens.Count);
             List<CodeTokenSO> draftedTokens = new List<CodeTokenSO>();
 
-            for (int draft = 0; draft < countToDraft; draft++)
+            if (roomIndex == 1)
+            {
+                ConsoleLogUI.Log("[Unlock] Clear Room 1 complete! Unlocked Section 1: Class Fields (damageMultiplier & baseShield)!");
+                // Room 1 Reward Draft: 1 Float, 1 Int, and 1 combat token for Room 2 preparation
+                var floatToken = eligibleTokens.Find(t => t.tokenType == CodeTokenType.Float);
+                var intToken = eligibleTokens.Find(t => t.tokenType == CodeTokenType.Int);
+                var shieldCheck = eligibleTokens.Find(t => t.name.Contains("ShieldCheck") || t.GetFormattedCodeString().Contains("IsShielded"));
+
+                if (floatToken != null) { draftedTokens.Add(floatToken); eligibleTokens.Remove(floatToken); }
+                if (intToken != null) { draftedTokens.Add(intToken); eligibleTokens.Remove(intToken); }
+                if (shieldCheck != null) { draftedTokens.Add(shieldCheck); eligibleTokens.Remove(shieldCheck); }
+            }
+            else if (roomIndex == 2)
+            {
+                ConsoleLogUI.Log("[Unlock] Clear Room 2 complete! Unlocked Section 3: Event Callback OnTakeDamage(int incomingDamage)!");
+                // Room 2 Reward Draft: 1 Reaction condition, 1 Defensive action, 1 other token
+                var reactionCond = eligibleTokens.Find(t => t is ConditionTokenSO c && c.subject == ConditionSubject.IncomingDamage);
+                var defAction = eligibleTokens.Find(t => t.name.Contains("Defensive") || t.GetFormattedCodeString().Contains("AddShield"));
+
+                if (reactionCond != null) { draftedTokens.Add(reactionCond); eligibleTokens.Remove(reactionCond); }
+                if (defAction != null) { draftedTokens.Add(defAction); eligibleTokens.Remove(defAction); }
+            }
+            else if (roomIndex == 3)
+            {
+                ConsoleLogUI.Log("[Unlock] Clear Room 3 complete! Full Roguelike Architecture Unlocked!");
+            }
+
+            // Fill remaining slots up to 3 using weighted random draft
+            int remainingToDraft = Mathf.Min(3 - draftedTokens.Count, eligibleTokens.Count);
+
+            for (int draft = 0; draft < remainingToDraft; draft++)
             {
                 float totalWeight = 0f;
                 for (int i = 0; i < eligibleTokens.Count; i++)

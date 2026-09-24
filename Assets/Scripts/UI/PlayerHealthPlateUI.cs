@@ -20,8 +20,9 @@ namespace CodeForge.UI
 
             if (player != null)
             {
-                player.OnHealthChanged += UpdateDisplay;
-                UpdateDisplay(player.CurrentHp, player.MaxHp);
+                player.OnHealthChanged += HandleHealthChanged;
+                player.OnShieldChanged += HandleShieldChanged;
+                RefreshDisplay();
             }
         }
 
@@ -29,28 +30,51 @@ namespace CodeForge.UI
         {
             if (player != null)
             {
-                player.OnHealthChanged -= UpdateDisplay;
+                player.OnHealthChanged -= HandleHealthChanged;
+                player.OnShieldChanged -= HandleShieldChanged;
             }
         }
 
         public void BindPlayer(PlayerCombatController targetPlayer)
         {
-            if (player != null) player.OnHealthChanged -= UpdateDisplay;
-            player = targetPlayer;
             if (player != null)
             {
-                player.OnHealthChanged += UpdateDisplay;
-                UpdateDisplay(player.CurrentHp, player.MaxHp);
+                player.OnHealthChanged -= HandleHealthChanged;
+                player.OnShieldChanged -= HandleShieldChanged;
+            }
+
+            player = targetPlayer;
+
+            if (player != null)
+            {
+                player.OnHealthChanged += HandleHealthChanged;
+                player.OnShieldChanged += HandleShieldChanged;
+                RefreshDisplay();
             }
         }
 
-        private void UpdateDisplay(float current, float max)
+        private void HandleHealthChanged(float current, float max)
         {
+            RefreshDisplay();
+        }
+
+        private void HandleShieldChanged(int shield)
+        {
+            RefreshDisplay();
+        }
+
+        private void RefreshDisplay()
+        {
+            if (player == null) return;
+
+            float current = player.CurrentHp;
+            float max = player.MaxHp;
             float ratio = max > 0 ? Mathf.Clamp01(current / max) : 0f;
 
             if (hpText != null)
             {
-                hpText.text = $"<b>PLAYER</b>   <size=85%>{Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)} HP</size>";
+                string shieldBadge = player.CurrentShield > 0 ? $" <color=#55AAFF>[+{player.CurrentShield} SHIELD]</color>" : "";
+                hpText.text = $"<b>PLAYER</b>   <size=85%>{Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)} HP{shieldBadge}</size>";
             }
 
             if (healthFillImage != null)

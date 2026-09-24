@@ -2,10 +2,13 @@ namespace CodeForge.UI
 {
     public enum CodeSocketRole
     {
-        AttacksPerTurn,
-        Damage,
+        Targeting,
+        Condition,
+        ActionThen,
+        ActionElse,
         DamageMultiplier,
-        Piercing,
-        Targeting
+        BaseShield,
+        ReactionCondition,
+        ReactionAction
     }
 }

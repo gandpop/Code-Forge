@@ -9,15 +9,18 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 09d591d0ac51e54428253619756b96c9, type: 3}
-  m_Name: Float_1.5
-  m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
-  tokenName: Float
-  tokenType: 3
-  codeDisplaySyntax: 1.5f
-  floatValue: 1.5
+  m_Script: {fileID: 11500000, guid: 7a1f893e110245a4980d4b29ce450002, type: 3}
+  m_Name: Condition_IncomingDamageHeavy
+  m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.ConditionTokenSO
+  tokenName: Heavy Hit Reaction
+  tokenType: 1
+  codeDisplaySyntax: incomingDamage >= 8
+  floatValue: 1
   intValue: 0
   rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100
+  subject: 5
+  op: 1
+  comparisonValue: 8

@@ -9,7 +9,26 @@ namespace CodeForge.UI
 {
     public class CodeEditorPanelUI : MonoBehaviour
     {
-        [Header("Sockets")]
+        [Header("Section 1: Class Fields (Unlocked Room 2+)")]
+        [SerializeField] private GameObject section1FieldsGroup;
+        [SerializeField] private GameObject section1LockedBanner;
+        [SerializeField] private CodeSocketUI damageMultiplierSocket;
+        [SerializeField] private CodeSocketUI baseShieldSocket;
+
+        [Header("Section 2: ExecuteTurn Method (Unlocked Room 1+)")]
+        [SerializeField] private GameObject section2ExecuteTurnGroup;
+        [SerializeField] private CodeSocketUI targetSocket;
+        [SerializeField] private CodeSocketUI conditionSocket;
+        [SerializeField] private CodeSocketUI thenActionSocket;
+        [SerializeField] private CodeSocketUI elseActionSocket;
+
+        [Header("Section 3: OnTakeDamage Callback (Unlocked Room 3+)")]
+        [SerializeField] private GameObject section3OnTakeDamageGroup;
+        [SerializeField] private GameObject section3LockedBanner;
+        [SerializeField] private CodeSocketUI reactionConditionSocket;
+        [SerializeField] private CodeSocketUI reactionActionSocket;
+
+        [Header("Legacy Fallbacks (Preserves Scene References)")]
         [SerializeField] private CodeSocketUI attacksSocket;
         [SerializeField] private CodeSocketUI damageSocket;
         [SerializeField] private CodeSocketUI multiplierSocket;
@@ -25,8 +44,25 @@ namespace CodeForge.UI
         [Header("Starter Loadout")]
         [SerializeField] private List<CodeTokenSO> starterTokens = new List<CodeTokenSO>();
 
+        public bool IsSection1Unlocked { get; private set; } = false;
+        public bool IsSection3Unlocked { get; private set; } = false;
+
+        public CodeSocketUI TargetSocketUI => targetSocket != null ? targetSocket : targetingSocket;
+        public CodeSocketUI ConditionSocketUI => conditionSocket != null ? conditionSocket : piercingSocket;
+        public CodeSocketUI ThenActionSocketUI => thenActionSocket != null ? thenActionSocket : damageSocket;
+        public CodeSocketUI ElseActionSocketUI => elseActionSocket != null ? elseActionSocket : multiplierSocket;
+        public CodeSocketUI DamageMultiplierSocketUI => damageMultiplierSocket;
+        public CodeSocketUI BaseShieldSocketUI => baseShieldSocket;
+        public CodeSocketUI ReactionConditionSocketUI => reactionConditionSocket;
+        public CodeSocketUI ReactionActionSocketUI => reactionActionSocket;
+
         private void Awake()
         {
+            if (targetSocket == null) targetSocket = targetingSocket;
+            if (conditionSocket == null) conditionSocket = piercingSocket;
+            if (thenActionSocket == null) thenActionSocket = damageSocket;
+            if (elseActionSocket == null) elseActionSocket = multiplierSocket;
+
             if (compileAndRunButton != null)
             {
                 compileAndRunButton.onClick.AddListener(() =>
@@ -39,11 +75,22 @@ namespace CodeForge.UI
             }
 
             // Ensure sockets have back-reference to this editor panel
-            if (attacksSocket != null) attacksSocket.SetEditorReference(this);
-            if (damageSocket != null) damageSocket.SetEditorReference(this);
-            if (multiplierSocket != null) multiplierSocket.SetEditorReference(this);
-            if (piercingSocket != null) piercingSocket.SetEditorReference(this);
-            if (targetingSocket != null) targetingSocket.SetEditorReference(this);
+            RegisterSocket(TargetSocketUI);
+            RegisterSocket(ConditionSocketUI);
+            RegisterSocket(ThenActionSocketUI);
+            RegisterSocket(ElseActionSocketUI);
+            RegisterSocket(damageMultiplierSocket);
+            RegisterSocket(baseShieldSocket);
+            RegisterSocket(reactionConditionSocket);
+            RegisterSocket(reactionActionSocket);
+        }
+
+        private void RegisterSocket(CodeSocketUI socket)
+        {
+            if (socket != null)
+            {
+                socket.SetEditorReference(this);
+            }
         }
 
         private void Start()
@@ -60,12 +107,64 @@ namespace CodeForge.UI
             }
         }
 
+        public void SetProgressionState(int roomIndex)
+        {
+            IsSection1Unlocked = roomIndex >= 2;
+            IsSection3Unlocked = roomIndex >= 3;
+
+            // Section 1: Class Fields
+            if (section1FieldsGroup != null)
+            {
+                section1FieldsGroup.SetActive(IsSection1Unlocked);
+            }
+            if (section1LockedBanner != null)
+            {
+                section1LockedBanner.SetActive(!IsSection1Unlocked);
+            }
+
+            // Section 2: ExecuteTurn (Always active)
+            if (section2ExecuteTurnGroup != null)
+            {
+                section2ExecuteTurnGroup.SetActive(true);
+            }
+
+            // Section 3: OnTakeDamage Callback
+            if (section3OnTakeDamageGroup != null)
+            {
+                section3OnTakeDamageGroup.SetActive(IsSection3Unlocked);
+            }
+            if (section3LockedBanner != null)
+            {
+                section3LockedBanner.SetActive(!IsSection3Unlocked);
+            }
+        }
+
         public void SetInteractionLocked(bool locked)
         {
             if (panelCanvasGroup != null)
             {
                 panelCanvasGroup.interactable = !locked;
-                panelCanvasGroup.alpha = locked ? 0.6f : 1.0f;
+                panelCanvasGroup.alpha = locked ? 0.75f : 1.0f;
+            }
+        }
+
+        public void ResetAllHighlights()
+        {
+            ResetSocketHighlight(TargetSocketUI);
+            ResetSocketHighlight(ConditionSocketUI);
+            ResetSocketHighlight(ThenActionSocketUI);
+            ResetSocketHighlight(ElseActionSocketUI);
+            ResetSocketHighlight(damageMultiplierSocket);
+            ResetSocketHighlight(baseShieldSocket);
+            ResetSocketHighlight(reactionConditionSocket);
+            ResetSocketHighlight(reactionActionSocket);
+        }
+
+        private void ResetSocketHighlight(CodeSocketUI socket)
+        {
+            if (socket != null)
+            {
+                socket.SetHighlight(Color.white, false, 1.0f);
             }
         }
 
@@ -83,7 +182,6 @@ namespace CodeForge.UI
             }
             else
             {
-                // Fallback for simple button/text
                 var text = cardObj.GetComponentInChildren<TextMeshProUGUI>();
                 if (text != null)
                 {
@@ -95,65 +193,104 @@ namespace CodeForge.UI
         public void AutoAssignToken(CodeTokenSO token)
         {
             if (token == null) return;
+
             switch (token.tokenType)
             {
+                case CodeTokenType.Targeting:
+                    if (TargetSocketUI != null && TargetSocketUI.AssignedToken == null)
+                        TargetSocketUI.AssignToken(token);
+                    break;
+
+                case CodeTokenType.Condition:
+                    if (token is ConditionTokenSO condToken && condToken.subject == ConditionSubject.IncomingDamage)
+                    {
+                        if (IsSection3Unlocked && reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                            reactionConditionSocket.AssignToken(token);
+                        else if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
+                            ConditionSocketUI.AssignToken(token);
+                    }
+                    else
+                    {
+                        if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
+                            ConditionSocketUI.AssignToken(token);
+                        else if (IsSection3Unlocked && reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                            reactionConditionSocket.AssignToken(token);
+                    }
+                    break;
+
+                case CodeTokenType.Action:
+                    if (ThenActionSocketUI != null && ThenActionSocketUI.AssignedToken == null)
+                        ThenActionSocketUI.AssignToken(token);
+                    else if (ElseActionSocketUI != null && ElseActionSocketUI.AssignedToken == null)
+                        ElseActionSocketUI.AssignToken(token);
+                    else if (IsSection3Unlocked && reactionActionSocket != null && reactionActionSocket.AssignedToken == null)
+                        reactionActionSocket.AssignToken(token);
+                    break;
+
                 case CodeTokenType.Float:
-                    if (multiplierSocket != null) multiplierSocket.AssignToken(token);
+                    if (IsSection1Unlocked && damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken == null)
+                        damageMultiplierSocket.AssignToken(token);
                     break;
+
                 case CodeTokenType.Int:
-                    // If attacks socket is default, slot attacks, else damage
-                    if (attacksSocket != null && attacksSocket.AssignedToken == null)
-                        attacksSocket.AssignToken(token);
-                    else if (damageSocket != null)
-                        damageSocket.AssignToken(token);
-                    break;
-                case CodeTokenType.Bool:
-                    if (piercingSocket != null) piercingSocket.AssignToken(token);
-                    break;
-                case CodeTokenType.TargetPriority:
-                    if (targetingSocket != null) targetingSocket.AssignToken(token);
+                    if (IsSection1Unlocked && baseShieldSocket != null && baseShieldSocket.AssignedToken == null)
+                        baseShieldSocket.AssignToken(token);
                     break;
             }
         }
 
-        public int GetSocketAttacksValue(int fallback = 1)
+        public float GetDamageMultiplier()
         {
-            if (attacksSocket != null && attacksSocket.AssignedToken != null)
-                return attacksSocket.AssignedToken.intValue;
-            if (attacksSocket != null) return attacksSocket.defaultInt;
-            return fallback;
+            if (IsSection1Unlocked && damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken != null)
+            {
+                return damageMultiplierSocket.AssignedToken.floatValue > 0f ? damageMultiplierSocket.AssignedToken.floatValue : 1.0f;
+            }
+            return 1.0f;
         }
 
-        public int GetSocketDamageValue(int fallback = 10)
+        public int GetBaseShield()
         {
-            if (damageSocket != null && damageSocket.AssignedToken != null)
-                return damageSocket.AssignedToken.intValue;
-            if (damageSocket != null) return damageSocket.defaultInt;
-            return fallback;
+            if (IsSection1Unlocked && baseShieldSocket != null && baseShieldSocket.AssignedToken != null)
+            {
+                return Mathf.Max(0, baseShieldSocket.AssignedToken.intValue);
+            }
+            return 0;
         }
 
-        public float GetSocketMultiplierValue(float fallback = 1.0f)
+        public TargetingTokenSO GetTargetingToken()
         {
-            if (multiplierSocket != null && multiplierSocket.AssignedToken != null)
-                return multiplierSocket.AssignedToken.floatValue;
-            if (multiplierSocket != null) return multiplierSocket.defaultFloat;
-            return fallback;
+            var socket = TargetSocketUI;
+            return socket != null ? socket.AssignedToken as TargetingTokenSO : null;
         }
 
-        public bool GetSocketBoolValue(CodeSocketRole role, bool fallback = false)
+        public ConditionTokenSO GetConditionToken()
         {
-            if (role == CodeSocketRole.Piercing && piercingSocket != null && piercingSocket.AssignedToken != null)
-                return piercingSocket.AssignedToken.boolValue;
-            if (piercingSocket != null) return piercingSocket.defaultBool;
-            return fallback;
+            var socket = ConditionSocketUI;
+            return socket != null ? socket.AssignedToken as ConditionTokenSO : null;
         }
 
-        public TargetPriority GetSocketTargetingValue(CodeSocketRole role, TargetPriority fallback = TargetPriority.LowestHealth)
+        public ActionTokenSO GetThenActionToken()
         {
-            if (role == CodeSocketRole.Targeting && targetingSocket != null && targetingSocket.AssignedToken != null)
-                return targetingSocket.AssignedToken.targetPriorityValue;
-            if (targetingSocket != null) return targetingSocket.defaultTargetPriority;
-            return fallback;
+            var socket = ThenActionSocketUI;
+            return socket != null ? socket.AssignedToken as ActionTokenSO : null;
+        }
+
+        public ActionTokenSO GetElseActionToken()
+        {
+            var socket = ElseActionSocketUI;
+            return socket != null ? socket.AssignedToken as ActionTokenSO : null;
+        }
+
+        public ConditionTokenSO GetReactionConditionToken()
+        {
+            if (!IsSection3Unlocked || reactionConditionSocket == null) return null;
+            return reactionConditionSocket.AssignedToken as ConditionTokenSO;
+        }
+
+        public ActionTokenSO GetReactionActionToken()
+        {
+            if (!IsSection3Unlocked || reactionActionSocket == null) return null;
+            return reactionActionSocket.AssignedToken as ActionTokenSO;
         }
     }
 }

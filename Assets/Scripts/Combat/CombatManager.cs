@@ -53,29 +53,48 @@ namespace CodeForge.Combat
             }
 
             SetPhase(GamePhase.Planning);
-            SpawnRoomEnemies(currentRoomIndex);
+            if (RoomProgressionManager.Instance != null)
+            {
+                RoomProgressionManager.Instance.SetRoom(currentRoomIndex);
+            }
+
             if (codeEditorUI != null)
             {
+                codeEditorUI.SetProgressionState(currentRoomIndex);
                 codeEditorUI.SetInteractionLocked(false);
+                codeEditorUI.ResetAllHighlights();
+
+                if (player != null)
+                {
+                    player.DamageMultiplier = codeEditorUI.GetDamageMultiplier();
+                    if (codeEditorUI.IsSection1Unlocked)
+                    {
+                        int baseShield = codeEditorUI.GetBaseShield();
+                        if (baseShield > 0)
+                        {
+                            player.AddShield(baseShield);
+                            ConsoleLogUI.Log($"[Stats] Applied baseShield +{baseShield} to Player.");
+                        }
+                    }
+                }
             }
-            ConsoleLogUI.Log($"[System] Initialized Room {currentRoomIndex}. Adjust PlayerController.cs and press Compile & Run.");
+
+            SpawnRoomEnemies(currentRoomIndex);
+
+            string roomTitle = currentRoomIndex switch
+            {
+                1 => "Room 1: 'Hello World' (ExecuteTurn Method)",
+                2 => "Room 2: 'The Variable Forge' (Class Fields)",
+                3 => "Room 3: 'The Reaction Test' (OnTakeDamage Callback)",
+                _ => $"Room {currentRoomIndex}: Scaling Dungeon"
+            };
+
+            ConsoleLogUI.Log($"[System] Initialized {roomTitle}. Configure PlayerCombat.cs and press Compile & Run.");
         }
 
         public void StartCombatExecution()
         {
             if (currentPhase != GamePhase.Planning) return;
-
-            // Extract values configured in code sockets (or default fallbacks)
-            int attacks = codeEditorUI != null ? codeEditorUI.GetSocketAttacksValue(1) : 1;
-            int dmg = codeEditorUI != null ? codeEditorUI.GetSocketDamageValue(10) : 10;
-            float mult = codeEditorUI != null ? codeEditorUI.GetSocketMultiplierValue(1.0f) : 1.0f;
-            bool pierce = codeEditorUI != null ? codeEditorUI.GetSocketBoolValue(CodeSocketRole.Piercing, false) : false;
-            TargetPriority prio = codeEditorUI != null ? codeEditorUI.GetSocketTargetingValue(CodeSocketRole.Targeting, TargetPriority.LowestHealth) : TargetPriority.LowestHealth;
-
-            if (player != null)
-            {
-                player.Configure(attacks, dmg, mult, pierce, prio);
-            }
 
             if (codeEditorUI != null)
             {
@@ -83,14 +102,14 @@ namespace CodeForge.Combat
             }
 
             SetPhase(GamePhase.Running);
-            ConsoleLogUI.Log($"[System] Build succeeded. Running PlayerController.cs (Attacks/Turn: {attacks}, Dmg: {dmg}, Mult: {mult:0.0}x, Pierce: {pierce}, Targeting: {prio})...");
+            ConsoleLogUI.Log($"[System] Compiling ExecuteTurn(). Starting pipeline execution...");
 
             combatCoroutine = StartCoroutine(CombatLoopCoroutine());
         }
 
         private IEnumerator CombatLoopCoroutine()
         {
-            yield return new WaitForSeconds(0.3f);
+            yield return new WaitForSeconds(0.2f);
 
             int round = 1;
 
@@ -112,13 +131,19 @@ namespace CodeForge.Combat
 
                 ConsoleLogUI.Log($"--- Round {round} ---");
 
-                // 1. Player Turn (Player attacks first)
+                // 1. Player Turn Pipeline Execution
                 if (player != null && !player.IsDead)
                 {
-                    yield return StartCoroutine(player.ExecutePlayerTurn(activeEnemies));
+                    var targetToken = codeEditorUI != null ? codeEditorUI.GetTargetingToken() : null;
+                    var condToken = codeEditorUI != null ? codeEditorUI.GetConditionToken() : null;
+                    var thenToken = codeEditorUI != null ? codeEditorUI.GetThenActionToken() : null;
+                    var elseToken = codeEditorUI != null ? codeEditorUI.GetElseActionToken() : null;
+
+                    var context = new CombatContext(player, activeEnemies, null, round);
+                    yield return StartCoroutine(player.ExecuteTurnPipeline(context, codeEditorUI, targetToken, condToken, thenToken, elseToken));
                 }
 
-                // Check victory after player attack
+                // Check victory after player pipeline completes
                 activeEnemies.RemoveAll(e => e == null || e.IsDead);
                 if (activeEnemies.Count == 0)
                 {
@@ -128,13 +153,14 @@ namespace CodeForge.Combat
 
                 yield return new WaitForSeconds(0.4f);
 
-                // 2. Enemies Turn (Each living enemy attacks sequentially)
+                // 2. Enemies Turn (Each living enemy acts based on telegraphed deterministic intent)
                 for (int i = 0; i < activeEnemies.Count; i++)
                 {
                     var enemy = activeEnemies[i];
                     if (enemy != null && !enemy.IsDead && player != null && !player.IsDead)
                     {
                         yield return StartCoroutine(enemy.ExecuteEnemyTurn(player));
+                        enemy.RollNextIntent(round + 1);
                         yield return new WaitForSeconds(0.25f);
                     }
                 }
@@ -154,16 +180,18 @@ namespace CodeForge.Combat
         private void HandleVictory()
         {
             SetPhase(GamePhase.Victory);
-            ConsoleLogUI.Log($"[Success] Room {currentRoomIndex} cleared without uncaught exceptions!");
+            if (codeEditorUI != null) codeEditorUI.ResetAllHighlights();
+            ConsoleLogUI.Log($"[Success] Room {currentRoomIndex} cleared without unhandled exceptions!");
             if (rewardPanelUI != null)
             {
-                rewardPanelUI.ShowRewardPrompt();
+                rewardPanelUI.ShowRewardPrompt(currentRoomIndex);
             }
         }
 
         private void HandleDefeat()
         {
             SetPhase(GamePhase.Defeat);
+            if (codeEditorUI != null) codeEditorUI.ResetAllHighlights();
             ConsoleLogUI.Log("[Error] Runtime Exception: Player terminated by enemy forces. Run Over.");
         }
 
@@ -172,7 +200,6 @@ namespace CodeForge.Combat
             currentRoomIndex++;
             if (player != null)
             {
-                // Health persists across rooms - do NOT heal to full!
                 player.AdvanceRoomReset();
             }
             EnterPlanningPhase();
@@ -210,13 +237,33 @@ namespace CodeForge.Combat
 
             if (enemyPrefab == null) return;
 
-            // Pokemon-style stationary staging positions in upper-right
-            float hpScale = 1f + (room - 1) * 0.25f;
-            SpawnEnemy($"Slime_Fast_R{room}", new Vector3(1.6f, 0.7f, 0f), 25f * hpScale, 5f);
-            SpawnEnemy($"Slime_Tank_R{room}", new Vector3(3.2f, 1.4f, 0f), 60f * hpScale, 12f);
+            switch (room)
+            {
+                case 1:
+                    // Room 1: "Hello World" (1x 15 HP Slime doing 3 DMG flat)
+                    SpawnEnemy("Training_Slime", new Vector3(2.4f, 1.0f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
+                    break;
+
+                case 2:
+                    // Room 2: "The Variable Forge" (1x Shield Beetle, 30 HP, rotates: Turn 1 [SHIELD 12], Turn 2 [ATK 6])
+                    SpawnEnemy("Shield_Beetle", new Vector3(2.4f, 1.0f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
+                    break;
+
+                case 3:
+                    // Room 3: "The Reaction Test" (1x Golem Charger 45 HP; Turn 1 & 2 [CHARGE], Turn 3 [HEAVY 20])
+                    SpawnEnemy("Golem_Charger", new Vector3(2.4f, 1.0f, 0f), 45f, 20f, EnemyArchetype.GolemCharger);
+                    break;
+
+                default:
+                    // Scaling encounters beyond Room 3
+                    float scale = 1f + (room - 3) * 0.25f;
+                    SpawnEnemy($"Slime_Elite_R{room}", new Vector3(1.6f, 0.7f, 0f), 25f * scale, 5f * scale, EnemyArchetype.Default);
+                    SpawnEnemy($"Golem_Elite_R{room}", new Vector3(3.2f, 1.4f, 0f), 50f * scale, 15f * scale, EnemyArchetype.GolemCharger);
+                    break;
+            }
         }
 
-        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg)
+        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
         {
             GameObject obj = Instantiate(enemyPrefab, enemySpawnContainer);
             obj.name = name;
@@ -225,9 +272,11 @@ namespace CodeForge.Combat
             EnemyEntity enemy = obj.GetComponent<EnemyEntity>();
             if (enemy != null)
             {
+                enemy.archetype = archetype;
                 enemy.contactDamage = dmg;
                 enemy.Initialize(player);
                 enemy.SetMaxHp(hp);
+                enemy.RollNextIntent(1);
                 activeEnemies.Add(enemy);
             }
         }

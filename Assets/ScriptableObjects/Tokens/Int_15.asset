@@ -13,12 +13,11 @@ MonoBehaviour:
   m_Name: Int_15
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Integer
-  tokenType: 1
+  tokenType: 4
+  codeDisplaySyntax: 15
+  floatValue: 0
+  intValue: 15
   rarity: 3
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100
-  floatValue: 0
-  intValue: 15
-  boolValue: 0
-  targetPriorityValue: 0

@@ -11,22 +11,38 @@ namespace CodeForge.UI
         public CodeSocketRole socketRole;
         public CodeTokenType expectedType;
 
-        [Header("Default Values (Used when no token slotted)")]
-        public float defaultFloat = 1.0f;
-        public int defaultInt = 10;
-        public bool defaultBool = false;
-        public TargetPriority defaultTargetPriority = TargetPriority.LowestHealth;
-
         [Header("UI References")]
         [SerializeField] private TextMeshProUGUI socketValueText;
         [SerializeField] private Button socketButton;
+        [SerializeField] private Image highlightBorder;
+        [SerializeField] private Outline socketOutline;
+        [SerializeField] private CanvasGroup socketCanvasGroup;
         [SerializeField] private CodeEditorPanelUI codeEditorUI;
 
         public CodeTokenSO AssignedToken { get; private set; }
+        private bool isHighlightActive = false;
 
         private void Awake()
         {
             if (codeEditorUI == null) codeEditorUI = GetComponentInParent<CodeEditorPanelUI>();
+            if (socketOutline == null) socketOutline = GetComponent<Outline>();
+            if (socketCanvasGroup == null) socketCanvasGroup = GetComponent<CanvasGroup>();
+
+            var layout = GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                // Horizontal inline pill ergonomics matching ~32-36px height and min 160px width
+                layout.minHeight = 32f;
+                layout.preferredHeight = 36f;
+                layout.minWidth = 160f;
+                layout.preferredWidth = Mathf.Max(layout.preferredWidth, 220f);
+            }
+
+            if (socketValueText != null)
+            {
+                socketValueText.textWrappingMode = TextWrappingModes.NoWrap;
+                socketValueText.overflowMode = TextOverflowModes.Ellipsis;
+            }
 
             if (socketButton != null)
             {
@@ -37,6 +53,7 @@ namespace CodeForge.UI
         private void Start()
         {
             RefreshDisplay();
+            SetHighlight(Color.white, false, 1.0f);
         }
 
         public void SetEditorReference(CodeEditorPanelUI editorUI)
@@ -78,7 +95,7 @@ namespace CodeForge.UI
                 {
                     codeEditorUI.AddTokenToInventory(oldToken);
                 }
-                ConsoleLogUI.Log($"[Syntax] Unslotted token from {socketRole}. Reverted to default value.");
+                ConsoleLogUI.Log($"[Syntax] Unslotted token from {socketRole}.");
             }
         }
 
@@ -100,43 +117,85 @@ namespace CodeForge.UI
 
             if (AssignedToken != null)
             {
-                socketValueText.text = $"<color=#4EC9B0>{AssignedToken.GetFormattedCodeString()}</color>";
+                socketValueText.text = $"<color=#4EC9B0><b>{AssignedToken.GetFormattedCodeString()}</b></color>";
+                if (!isHighlightActive && socketOutline != null)
+                {
+                    socketOutline.enabled = true;
+                    socketOutline.effectColor = new Color(0.25f, 0.45f, 0.55f, 0.5f);
+                    socketOutline.effectDistance = new Vector2(1.5f, -1.5f);
+                }
             }
             else
             {
-                string defaultValStr = expectedType switch
+                // Clean hollow placeholder prompt (fixes "phantom default" confusion)
+                string placeholder = expectedType switch
                 {
-                    CodeTokenType.Float => $"{defaultFloat:0.0}f",
-                    CodeTokenType.Int => $"{defaultInt}",
-                    CodeTokenType.Bool => defaultBool ? "true" : "false",
-                    CodeTokenType.TargetPriority => $"TargetPriority.{defaultTargetPriority}",
-                    _ => "null"
+                    CodeTokenType.Targeting => "[ Drop Target Rule ]",
+                    CodeTokenType.Condition => "[ Drop Condition ]",
+                    CodeTokenType.Action => "[ Drop Action ]",
+                    CodeTokenType.Float => "[ Drop Float ]",
+                    CodeTokenType.Int => "[ Drop Int ]",
+                    _ => "[ Drop Token ]"
                 };
 
-                socketValueText.text = $"<color=#9E9E9E>{defaultValStr}</color> <size=70%><color=#6E6E6E>(default)</color></size>";
+                socketValueText.text = $"<color=#707070><i>{placeholder}</i></color>";
+                if (!isHighlightActive && socketOutline != null)
+                {
+                    socketOutline.enabled = true;
+                    socketOutline.effectColor = new Color(0.4f, 0.4f, 0.4f, 0.35f);
+                    socketOutline.effectDistance = new Vector2(1f, -1f);
+                }
+            }
+        }
+
+        public void SetHighlight(Color color, bool active, float alpha = 1.0f)
+        {
+            isHighlightActive = active;
+
+            if (socketOutline == null) socketOutline = GetComponent<Outline>();
+            if (socketOutline != null)
+            {
+                if (active)
+                {
+                    socketOutline.enabled = true;
+                    socketOutline.effectColor = color;
+                    socketOutline.effectDistance = new Vector2(3f, -3f);
+                }
+                else
+                {
+                    // Revert to neutral state
+                    if (AssignedToken != null)
+                    {
+                        socketOutline.enabled = true;
+                        socketOutline.effectColor = new Color(0.25f, 0.45f, 0.55f, 0.5f);
+                        socketOutline.effectDistance = new Vector2(1.5f, -1.5f);
+                    }
+                    else
+                    {
+                        socketOutline.enabled = true;
+                        socketOutline.effectColor = new Color(0.4f, 0.4f, 0.4f, 0.35f);
+                        socketOutline.effectDistance = new Vector2(1f, -1f);
+                    }
+                }
+            }
+
+            if (highlightBorder != null)
+            {
+                highlightBorder.gameObject.SetActive(active);
+                if (active) highlightBorder.color = color;
+            }
+
+            if (socketCanvasGroup == null) socketCanvasGroup = GetComponent<CanvasGroup>();
+            if (socketCanvasGroup != null)
+            {
+                socketCanvasGroup.alpha = alpha;
             }
         }
 
         private void LogTypeMismatchError(CodeTokenSO token, CodeTokenType targetType)
         {
             CodeTokenType actualType = token.tokenType;
-
-            if (actualType == CodeTokenType.Int && targetType == CodeTokenType.Float)
-            {
-                ConsoleLogUI.Log($"[Compile Error] CS0029: Cannot implicitly convert type 'int' ({token.intValue}) to 'float'. In C#, integers only store whole numbers, while floats represent fractional/decimal precision. Consider using a float literal (e.g. {token.intValue}.0f).");
-            }
-            else if (actualType == CodeTokenType.Float && targetType == CodeTokenType.Int)
-            {
-                ConsoleLogUI.Log($"[Compile Error] CS0266: Cannot implicitly convert type 'float' ({token.floatValue:0.0}f) to 'int'. An explicit conversion exists (are you missing a cast?). Floats hold fractional numbers; casting to integer causes loss of decimal precision.");
-            }
-            else if (actualType == CodeTokenType.Bool)
-            {
-                ConsoleLogUI.Log($"[Compile Error] CS0029: Cannot implicitly convert type 'bool' to '{targetType.ToString().ToLower()}'. Booleans only represent truth states (true/false) and cannot be assigned to numerical or enum variables.");
-            }
-            else
-            {
-                ConsoleLogUI.Log($"[Compile Error] CS0029: Cannot implicitly convert type '{actualType}' to '{targetType}'. C# is strongly-typed; variables must be assigned matching types.");
-            }
+            ConsoleLogUI.Log($"[Compile Error] CS0029: Cannot implicitly convert type '{actualType}' to '{targetType}'. Slot [{socketRole}] strictly requires a '{targetType}' token.");
         }
     }
 }

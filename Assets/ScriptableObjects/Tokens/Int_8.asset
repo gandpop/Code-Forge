@@ -13,12 +13,11 @@ MonoBehaviour:
   m_Name: Int_8
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Integer
-  tokenType: 1
+  tokenType: 4
+  codeDisplaySyntax: 8
+  floatValue: 0
+  intValue: 8
   rarity: 3
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100
-  floatValue: 0
-  intValue: 8
-  boolValue: 0
-  targetPriorityValue: 0

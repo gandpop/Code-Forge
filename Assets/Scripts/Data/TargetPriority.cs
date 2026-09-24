@@ -3,6 +3,9 @@ namespace CodeForge.Data
     public enum TargetPriority
     {
         LowestHealth,
-        HighestHealth
+        HighestHealth,
+        HighestThreat,
+        FirstInLine,
+        BossOnly
     }
 }

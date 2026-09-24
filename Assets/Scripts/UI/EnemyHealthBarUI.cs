@@ -20,8 +20,9 @@ namespace CodeForge.UI
 
             if (targetEntity != null)
             {
-                targetEntity.OnHealthChanged += UpdateHealth;
-                UpdateHealth(targetEntity.CurrentHp, targetEntity.MaxHp);
+                targetEntity.OnHealthChanged += HandleHealthChanged;
+                targetEntity.OnShieldChanged += HandleShieldChanged;
+                RefreshDisplay();
             }
         }
 
@@ -29,28 +30,51 @@ namespace CodeForge.UI
         {
             if (targetEntity != null)
             {
-                targetEntity.OnHealthChanged -= UpdateHealth;
+                targetEntity.OnHealthChanged -= HandleHealthChanged;
+                targetEntity.OnShieldChanged -= HandleShieldChanged;
             }
         }
 
         public void BindEntity(CombatEntity entity)
         {
-            if (targetEntity != null) targetEntity.OnHealthChanged -= UpdateHealth;
-            targetEntity = entity;
             if (targetEntity != null)
             {
-                targetEntity.OnHealthChanged += UpdateHealth;
-                UpdateHealth(targetEntity.CurrentHp, targetEntity.MaxHp);
+                targetEntity.OnHealthChanged -= HandleHealthChanged;
+                targetEntity.OnShieldChanged -= HandleShieldChanged;
+            }
+
+            targetEntity = entity;
+
+            if (targetEntity != null)
+            {
+                targetEntity.OnHealthChanged += HandleHealthChanged;
+                targetEntity.OnShieldChanged += HandleShieldChanged;
+                RefreshDisplay();
             }
         }
 
-        private void UpdateHealth(float current, float max)
+        private void HandleHealthChanged(float current, float max)
         {
+            RefreshDisplay();
+        }
+
+        private void HandleShieldChanged(int shield)
+        {
+            RefreshDisplay();
+        }
+
+        private void RefreshDisplay()
+        {
+            if (targetEntity == null) return;
+
+            float current = targetEntity.CurrentHp;
+            float max = targetEntity.MaxHp;
             float ratio = max > 0 ? Mathf.Clamp01(current / max) : 0f;
 
-            if (nameAndHpText != null && targetEntity != null)
+            if (nameAndHpText != null)
             {
-                nameAndHpText.text = $"{targetEntity.name}\n<size=80%>{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)} HP</size>";
+                string shieldBadge = targetEntity.CurrentShield > 0 ? $" <color=#55AAFF>[+{targetEntity.CurrentShield} SHIELD]</color>" : "";
+                nameAndHpText.text = $"{targetEntity.name}\n<size=80%>{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)} HP{shieldBadge}</size>";
             }
 
             if (fillImage != null)
