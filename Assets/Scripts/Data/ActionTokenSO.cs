@@ -28,14 +28,25 @@ namespace CodeForge.Data
         {
             if (context == null || context.Player == null) yield break;
 
+            var editorUI = Object.FindFirstObjectByType<CodeEditorPanelUI>();
+            float actionValue = baseValue;
+            if (codeDisplaySyntax != null && codeDisplaySyntax.Contains("Attack(target)") && editorUI != null)
+            {
+                actionValue = editorUI.GetAttackDamage();
+            }
+            else if (codeDisplaySyntax != null && codeDisplaySyntax.Contains("Defend()") && editorUI != null)
+            {
+                actionValue = editorUI.GetDefendShield();
+            }
+
             switch (category)
             {
                 case ActionCategory.Attack:
                     yield return context.Player.PerformAttackAnimation();
 
                     float mult = context.Player != null ? context.Player.DamageMultiplier : 1.0f;
-                    float effectiveDamage = baseValue * mult;
-                    string multText = mult != 1.0f ? $" (Base {baseValue} * {mult}x = {effectiveDamage} DMG)" : $" for {effectiveDamage} DMG";
+                    float effectiveDamage = actionValue * mult;
+                    string multText = mult != 1.0f ? $" (Base {actionValue} * {mult}x = {effectiveDamage} DMG)" : $" for {effectiveDamage} DMG";
 
                     if (isAreaOfEffect)
                     {
@@ -65,7 +76,7 @@ namespace CodeForge.Data
                     break;
 
                 case ActionCategory.Defense:
-                    int shieldToAdd = Mathf.RoundToInt(baseValue);
+                    int shieldToAdd = Mathf.RoundToInt(actionValue);
                     context.Player.AddShield(shieldToAdd);
                     ConsoleLogUI.Log($"[Action] Executing '{GetFormattedCodeString()}': Player gained +{shieldToAdd} Shield!");
                     yield return new WaitForSeconds(0.2f);

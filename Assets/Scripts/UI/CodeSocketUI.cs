@@ -6,7 +6,7 @@ using CodeForge.Data;
 
 namespace CodeForge.UI
 {
-    public class CodeSocketUI : MonoBehaviour, IDropHandler
+    public class CodeSocketUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         public CodeSocketRole socketRole;
         public CodeTokenType expectedType;
@@ -20,22 +20,31 @@ namespace CodeForge.UI
         [SerializeField] private CodeEditorPanelUI codeEditorUI;
 
         public CodeTokenSO AssignedToken { get; private set; }
+        public CodeEditorPanelUI EditorUI => codeEditorUI != null ? codeEditorUI : (codeEditorUI = GetComponentInParent<CodeEditorPanelUI>() ?? Object.FindFirstObjectByType<CodeEditorPanelUI>());
         private bool isHighlightActive = false;
 
         private void Awake()
         {
-            if (codeEditorUI == null) codeEditorUI = GetComponentInParent<CodeEditorPanelUI>();
+            if (codeEditorUI == null) codeEditorUI = GetComponentInParent<CodeEditorPanelUI>() ?? Object.FindFirstObjectByType<CodeEditorPanelUI>();
             if (socketOutline == null) socketOutline = GetComponent<Outline>();
             if (socketCanvasGroup == null) socketCanvasGroup = GetComponent<CanvasGroup>();
 
             var layout = GetComponent<LayoutElement>();
             if (layout != null)
             {
-                // Horizontal inline pill ergonomics matching ~32-36px height and min 160px width
-                layout.minHeight = 32f;
-                layout.preferredHeight = 36f;
-                layout.minWidth = 160f;
-                layout.preferredWidth = Mathf.Max(layout.preferredWidth, 220f);
+                layout.minHeight = 20f;
+                layout.preferredHeight = 20f;
+                layout.preferredWidth = expectedType switch
+                {
+                    CodeTokenType.Int => 60f,
+                    CodeTokenType.Float => 80f,
+                    CodeTokenType.Stance => 160f,
+                    CodeTokenType.Targeting => 180f,
+                    CodeTokenType.Condition => 220f,
+                    CodeTokenType.Action => 190f,
+                    _ => 150f
+                };
+                layout.minWidth = layout.preferredWidth;
             }
 
             if (socketValueText != null)
@@ -46,7 +55,8 @@ namespace CodeForge.UI
 
             if (socketButton != null)
             {
-                socketButton.onClick.AddListener(UnslotToken);
+                socketButton.onClick.RemoveAllListeners();
+                socketButton.onClick.AddListener(OnSocketClicked);
             }
         }
 
@@ -61,8 +71,61 @@ namespace CodeForge.UI
             codeEditorUI = editorUI;
         }
 
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (Combat.CombatManager.Instance != null && Combat.CombatManager.Instance.currentPhase == Combat.GamePhase.Running)
+            {
+                return;
+            }
+
+            if (eventData.button == PointerEventData.InputButton.Right)
+            {
+                UnslotToken();
+            }
+            else
+            {
+                OnSocketClicked();
+            }
+        }
+
+        private void OnSocketClicked()
+        {
+            if (Combat.CombatManager.Instance != null && Combat.CombatManager.Instance.currentPhase == Combat.GamePhase.Running)
+            {
+                return;
+            }
+
+            if (IntelliSensePopoverUI.Instance != null)
+            {
+                IntelliSensePopoverUI.Instance.Show(this, transform.position);
+            }
+        }
+
+        public void OnPointerEnter(PointerEventData eventData)
+        {
+            if (!isHighlightActive && socketOutline != null)
+            {
+                socketOutline.enabled = true;
+                socketOutline.effectColor = new Color(0f, 0.48f, 0.8f, 0.85f); // VS Code Blue
+                socketOutline.effectDistance = new Vector2(1f, -1f);
+            }
+        }
+
+        public void OnPointerExit(PointerEventData eventData)
+        {
+            if (!isHighlightActive)
+            {
+                UpdateIdleOutline();
+            }
+        }
+
         public void OnDrop(PointerEventData eventData)
         {
+            if (Combat.CombatManager.Instance != null && Combat.CombatManager.Instance.currentPhase == Combat.GamePhase.Running)
+            {
+                return;
+            }
+
             var draggedCard = eventData.pointerDrag?.GetComponent<DraggableTokenCardUI>();
             if (draggedCard == null || draggedCard.Token == null) return;
 
@@ -72,7 +135,6 @@ namespace CodeForge.UI
                 return;
             }
 
-            // Valid drop! If we already have a token equipped, return it to the inventory shelf
             if (AssignedToken != null && codeEditorUI != null)
             {
                 codeEditorUI.AddTokenToInventory(AssignedToken);
@@ -117,32 +179,57 @@ namespace CodeForge.UI
 
             if (AssignedToken != null)
             {
-                socketValueText.text = $"<color=#4EC9B0><b>{AssignedToken.GetFormattedCodeString()}</b></color>";
-                if (!isHighlightActive && socketOutline != null)
+                string syntax = AssignedToken.GetFormattedCodeString();
+                string coloredSyntax = expectedType switch
                 {
-                    socketOutline.enabled = true;
-                    socketOutline.effectColor = new Color(0.25f, 0.45f, 0.55f, 0.5f);
-                    socketOutline.effectDistance = new Vector2(1.5f, -1.5f);
-                }
+                    CodeTokenType.Targeting => $"<color=#DCDCAA>{syntax}</color>",
+                    CodeTokenType.Condition => $"<color=#9CDCFE>{syntax}</color>",
+                    CodeTokenType.Action => $"<color=#DCDCAA>{syntax}</color>",
+                    CodeTokenType.Float => $"<color=#B5CEA8>{syntax}</color>",
+                    CodeTokenType.Int => $"<color=#B5CEA8>{syntax}</color>",
+                    CodeTokenType.Stance => $"<color=#4EC9B0>{syntax}</color>",
+                    _ => $"<color=#D4D4D4>{syntax}</color>"
+                };
+
+                socketValueText.text = $"<b>{coloredSyntax}</b>";
             }
             else
             {
-                // Clean hollow placeholder prompt (fixes "phantom default" confusion)
-                string placeholder = expectedType switch
+                string prompt = expectedType switch
                 {
-                    CodeTokenType.Targeting => "[ Drop Target Rule ]",
-                    CodeTokenType.Condition => "[ Drop Condition ]",
-                    CodeTokenType.Action => "[ Drop Action ]",
-                    CodeTokenType.Float => "[ Drop Float ]",
-                    CodeTokenType.Int => "[ Drop Int ]",
-                    _ => "[ Drop Token ]"
+                    CodeTokenType.Targeting => "<color=#6E6E6E>[ <color=#C586C0>target</color> ]</color>",
+                    CodeTokenType.Condition => "<color=#6E6E6E>[ <color=#9CDCFE>condition</color> ]</color>",
+                    CodeTokenType.Action => "<color=#6E6E6E>[ <color=#DCDCAA>action</color> ]</color>",
+                    CodeTokenType.Float => "<color=#6E6E6E>[ <color=#B5CEA8>float</color> ]</color>",
+                    CodeTokenType.Int => "<color=#6E6E6E>[ <color=#B5CEA8>int</color> ]</color>",
+                    CodeTokenType.Stance => "<color=#6E6E6E>[ <color=#4EC9B0>stance</color> ]</color>",
+                    _ => "<color=#6E6E6E>[ select ]</color>"
                 };
 
-                socketValueText.text = $"<color=#707070><i>{placeholder}</i></color>";
-                if (!isHighlightActive && socketOutline != null)
+                socketValueText.text = $"<i>{prompt}</i>";
+            }
+
+            if (!isHighlightActive)
+            {
+                UpdateIdleOutline();
+            }
+        }
+
+        private void UpdateIdleOutline()
+        {
+            if (socketOutline == null) socketOutline = GetComponent<Outline>();
+            if (socketOutline != null)
+            {
+                if (AssignedToken != null)
                 {
                     socketOutline.enabled = true;
-                    socketOutline.effectColor = new Color(0.4f, 0.4f, 0.4f, 0.35f);
+                    socketOutline.effectColor = new Color(0.25f, 0.25f, 0.32f, 0.4f);
+                    socketOutline.effectDistance = new Vector2(1f, -1f);
+                }
+                else
+                {
+                    socketOutline.enabled = true;
+                    socketOutline.effectColor = new Color(0.4f, 0.4f, 0.5f, 0.5f);
                     socketOutline.effectDistance = new Vector2(1f, -1f);
                 }
             }
@@ -159,23 +246,11 @@ namespace CodeForge.UI
                 {
                     socketOutline.enabled = true;
                     socketOutline.effectColor = color;
-                    socketOutline.effectDistance = new Vector2(3f, -3f);
+                    socketOutline.effectDistance = new Vector2(2.5f, -2.5f);
                 }
                 else
                 {
-                    // Revert to neutral state
-                    if (AssignedToken != null)
-                    {
-                        socketOutline.enabled = true;
-                        socketOutline.effectColor = new Color(0.25f, 0.45f, 0.55f, 0.5f);
-                        socketOutline.effectDistance = new Vector2(1.5f, -1.5f);
-                    }
-                    else
-                    {
-                        socketOutline.enabled = true;
-                        socketOutline.effectColor = new Color(0.4f, 0.4f, 0.4f, 0.35f);
-                        socketOutline.effectDistance = new Vector2(1f, -1f);
-                    }
+                    UpdateIdleOutline();
                 }
             }
 
@@ -194,8 +269,36 @@ namespace CodeForge.UI
 
         private void LogTypeMismatchError(CodeTokenSO token, CodeTokenType targetType)
         {
-            CodeTokenType actualType = token.tokenType;
-            ConsoleLogUI.Log($"[Compile Error] CS0029: Cannot implicitly convert type '{actualType}' to '{targetType}'. Slot [{socketRole}] strictly requires a '{targetType}' token.");
+            ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] CS0029: Cannot implicitly convert type '{token.tokenType.ToString().ToLower()}' to '{targetType.ToString().ToLower()}'</color>");
+            StopAllCoroutines();
+            StartCoroutine(FlashRedRoutine(0.4f));
+        }
+
+        private System.Collections.IEnumerator FlashRedRoutine(float duration)
+        {
+            SetHighlight(new Color(1f, 0.25f, 0.25f, 1f), true, 1.0f);
+            yield return new WaitForSeconds(duration);
+            SetHighlight(Color.white, false, 1.0f);
+        }
+
+        public void TriggerUnassignedPulsingHighlight()
+        {
+            StopAllCoroutines();
+            StartCoroutine(PulsingRedRoutine(2.0f));
+        }
+
+        private System.Collections.IEnumerator PulsingRedRoutine(float duration)
+        {
+            float elapsed = 0f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.deltaTime;
+                float alpha = (Mathf.Sin(elapsed * 12f) + 1f) * 0.5f;
+                Color pulseColor = Color.Lerp(new Color(1f, 0.2f, 0.2f, 0.3f), new Color(1f, 0.2f, 0.2f, 1f), alpha);
+                SetHighlight(pulseColor, true, 1.0f);
+                yield return null;
+            }
+            SetHighlight(Color.white, false, 1.0f);
         }
     }
 }

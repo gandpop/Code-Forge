@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Float_3
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Float
-  tokenType: 0
+  tokenType: 3
   rarity: 3
   canSpawnAsReward: 1
   overrideSpawnChance: 0

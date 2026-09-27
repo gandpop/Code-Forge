@@ -9,8 +9,12 @@ namespace CodeForge.Combat
     public class PlayerCombatController : CombatEntity
     {
         [Header("Script Bound Stats")]
-        public float DamageMultiplier { get; set; } = 1.0f;
+        public int MaxHealth { get; set; } = 20;
+        public float DamageMultiplier { get; set; } = 1.2f;
         public int BaseShield { get; set; } = 0;
+        [System.Obsolete] public PlayerStance CurrentStance { get; private set; } = PlayerStance.Balanced;
+        [System.Obsolete] public StanceTokenSO SlottedStanceToken { get; private set; }
+        public float EffectiveDamageMultiplier => Mathf.Max(0.1f, DamageMultiplier);
 
         private Vector3 initialPosition;
 
@@ -20,9 +24,57 @@ namespace CodeForge.Combat
             initialPosition = transform.position;
         }
 
+        public void SetMaxHealth(int amount)
+        {
+            if (amount <= 0) amount = 20;
+            MaxHealth = amount;
+            SetMaxHp(amount);
+        }
+
+        public void AddStartingShield(int amount)
+        {
+            if (amount <= 0) return;
+            AddShield(amount);
+            ConsoleLogUI.Log($"[Start] Executed player.AddStartingShield({amount}) -> Current Shield: {CurrentShield}.");
+        }
+
+        [System.Obsolete]
+        public void SetStance(StanceTokenSO stanceToken)
+        {
+            SlottedStanceToken = stanceToken;
+            CurrentStance = stanceToken != null ? stanceToken.stance : PlayerStance.Balanced;
+        }
+
         public IEnumerator PerformAttackAnimation()
         {
             yield return PerformAttackLunge(new Vector3(0.5f, 0.3f, 0f));
+        }
+
+        /// <summary>
+        /// Executes the void Start() block once when encounter initializes before Round 1.
+        /// </summary>
+        public IEnumerator ExecuteStartBlock(CombatContext context, CodeEditorPanelUI editorUI)
+        {
+            if (editorUI == null) yield break;
+
+            int maxHealth = editorUI.GetMaxHealth();
+            int startingShield = editorUI.GetBaseShield();
+            float dmgMult = editorUI.GetDamageMultiplier();
+
+            // Line 25: player.SetMaxHealth(maxHealth);
+            editorUI.HighlightLine(25, true);
+            SetMaxHealth(maxHealth);
+            yield return new WaitForSeconds(0.2f);
+            editorUI.HighlightLine(25, false);
+
+            // Line 26: player.AddStartingShield(baseShield);
+            editorUI.HighlightLine(26, true);
+            AddStartingShield(startingShield);
+            yield return new WaitForSeconds(0.2f);
+            editorUI.HighlightLine(26, false);
+
+            ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x");
+            yield return new WaitForSeconds(0.2f);
         }
 
         public IEnumerator ExecuteTurnPipeline(
@@ -35,27 +87,38 @@ namespace CodeForge.Combat
         {
             if (IsDead || context == null || context.ActiveEnemies == null || context.ActiveEnemies.Count == 0) yield break;
 
-            // Update stats from editor before turn execution
             if (editorUI != null)
             {
                 DamageMultiplier = editorUI.GetDamageMultiplier();
             }
 
-            // Step 1: Resolve Target
+            // Step 1: Resolve Target (Line 31)
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(31, true);
+            }
             EnemyEntity target = targetingToken != null
                 ? targetingToken.ResolveTarget(context.ActiveEnemies)
                 : SelectFallbackTarget(context.ActiveEnemies);
 
-            string targetSyntax = targetingToken != null ? targetingToken.GetFormattedCodeString() : "Enemies.LowestHP()";
+            string targetSyntax = targetingToken != null ? targetingToken.GetFormattedCodeString() : "Enemies.Random()";
             ConsoleLogUI.Log($"[Target] Selected {target?.name ?? "None"} via '{targetSyntax}'");
 
             if (editorUI != null && editorUI.TargetSocketUI != null)
             {
                 editorUI.TargetSocketUI.SetHighlight(new Color(0.25f, 0.75f, 1f, 1f), true, 1.0f);
             }
-            yield return new WaitForSeconds(0.35f);
+            yield return new WaitForSeconds(0.2f);
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(31, false);
+            }
 
-            // Step 2: Evaluate Condition
+            // Step 2: Evaluate Condition (Line 33)
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(33, true);
+            }
             CombatContext contextWithTarget = context.WithTarget(target);
             bool evalResult = conditionToken != null ? conditionToken.Evaluate(contextWithTarget) : true;
             string condSyntax = conditionToken != null ? conditionToken.GetFormattedCodeString() : "true";
@@ -71,7 +134,7 @@ namespace CodeForge.Combat
                 Color condColor = evalResult ? new Color(0.2f, 0.9f, 0.3f, 1f) : new Color(0.95f, 0.25f, 0.25f, 1f);
                 if (editorUI.ConditionSocketUI != null) editorUI.ConditionSocketUI.SetHighlight(condColor, true, 1.0f);
 
-                // Step 3: Branch Visual Feedback (Glow active branch, Dim rejected branch)
+                // Branch Visual Feedback
                 if (evalResult)
                 {
                     if (editorUI.ThenActionSocketUI != null) editorUI.ThenActionSocketUI.SetHighlight(new Color(0.2f, 0.9f, 0.3f, 1f), true, 1.0f);
@@ -83,38 +146,54 @@ namespace CodeForge.Combat
                     if (editorUI.ThenActionSocketUI != null) editorUI.ThenActionSocketUI.SetHighlight(Color.gray, false, 0.3f);
                 }
             }
-            yield return new WaitForSeconds(0.4f);
+            yield return new WaitForSeconds(0.2f);
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(33, false);
+            }
 
-            // Step 4: Execute Selected Action
+            // Step 3: Execute Selected Action (Line 35 or Line 39)
             ActionTokenSO chosenAction = evalResult ? thenActionToken : elseActionToken;
+            int actionLine = evalResult ? 35 : 39;
+            string actionSyntax = chosenAction != null ? chosenAction.GetFormattedCodeString() : "Attack(target)";
+
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(actionLine, true);
+            }
+
             if (chosenAction != null)
             {
                 ConsoleLogUI.Log($"[Action] Executing '{chosenAction.GetFormattedCodeString()}'");
+                
+                // Highlight modular method definition if executing Attack or Defend
+                int methodLine = 0;
+                if (actionSyntax.Contains("Attack")) methodLine = 14;
+                else if (actionSyntax.Contains("Defend")) methodLine = 20;
+
+                if (methodLine > 0 && editorUI != null) editorUI.HighlightLine(methodLine, true);
+
                 yield return chosenAction.ExecuteAction(contextWithTarget);
+
+                if (methodLine > 0 && editorUI != null) editorUI.HighlightLine(methodLine, false);
             }
             else
             {
-                float defaultDmg = 5f * DamageMultiplier;
-                string multSuffix = DamageMultiplier != 1.0f ? $" (5 * {DamageMultiplier}x = {defaultDmg} DMG)" : $" for {defaultDmg} DMG";
-                ConsoleLogUI.Log($"[Action] No action slotted in active branch; executing default strike on {target?.name ?? "enemy"}{multSuffix}.");
-                if (target != null && !target.IsDead)
-                {
-                    yield return PerformAttackAnimation();
-                    target.TakeDamage(defaultDmg);
-                }
+                ConsoleLogUI.Log("[Action] No action slotted in active branch; turn finished.");
                 yield return new WaitForSeconds(0.2f);
             }
 
-            yield return new WaitForSeconds(0.25f);
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(actionLine, false);
+            }
+            yield return new WaitForSeconds(0.2f);
             if (editorUI != null)
             {
                 editorUI.ResetAllHighlights();
             }
         }
 
-        /// <summary>
-        /// Handles the event-driven defensive reaction when incoming damage is detected during enemy turns.
-        /// </summary>
         public IEnumerator HandleIncomingDamageReaction(int incomingDamage, CodeEditorPanelUI editorUI = null, List<EnemyEntity> activeEnemies = null)
         {
             if (IsDead) yield break;
@@ -124,7 +203,7 @@ namespace CodeForge.Combat
                 editorUI = FindAnyObjectByType<CodeEditorPanelUI>();
             }
 
-            if (editorUI == null || !editorUI.IsSection3Unlocked) yield break;
+            if (editorUI == null) yield break;
 
             var reactionCond = editorUI.GetReactionConditionToken();
             var reactionAction = editorUI.GetReactionActionToken();
@@ -133,6 +212,11 @@ namespace CodeForge.Combat
 
             var context = new CombatContext(this, activeEnemies, null, 0).WithIncomingDamage(incomingDamage);
 
+            // Step 1: Reaction Condition (Line 45)
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(45, true);
+            }
             bool evalResult = reactionCond != null ? reactionCond.Evaluate(context) : true;
             string condSyntax = reactionCond != null ? reactionCond.GetFormattedCodeString() : "true";
 
@@ -141,28 +225,44 @@ namespace CodeForge.Combat
                 Color condColor = evalResult ? new Color(0.2f, 0.9f, 0.3f, 1f) : new Color(0.95f, 0.25f, 0.25f, 1f);
                 editorUI.ReactionConditionSocketUI.SetHighlight(condColor, true, 1.0f);
             }
+            yield return new WaitForSeconds(0.2f);
+            if (editorUI != null)
+            {
+                editorUI.HighlightLine(45, false);
+            }
 
             if (evalResult)
             {
-                string actionSyntax = reactionAction != null ? reactionAction.GetFormattedCodeString() : "player.AddShield(10)";
-                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}) triggered! Condition '{condSyntax}' is TRUE -> Executed {actionSyntax}.");
+                string actionStr = reactionAction != null ? reactionAction.GetFormattedCodeString() : "Defend()";
+                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}) triggered! Condition '{condSyntax}' is TRUE -> Executed {actionStr}.");
+
+                // Step 2: Reaction Action (Line 47)
+                if (editorUI != null)
+                {
+                    editorUI.HighlightLine(47, true);
+                }
 
                 if (editorUI.ReactionActionSocketUI != null)
                 {
                     editorUI.ReactionActionSocketUI.SetHighlight(new Color(0.2f, 0.9f, 0.3f, 1f), true, 1.0f);
                 }
-                yield return new WaitForSeconds(0.35f);
+                yield return new WaitForSeconds(0.2f);
 
                 if (reactionAction != null)
                 {
+                    if (actionStr.Contains("Defend") && editorUI != null) editorUI.HighlightLine(20, true);
                     yield return reactionAction.ExecuteAction(context);
+                    if (actionStr.Contains("Defend") && editorUI != null) editorUI.HighlightLine(20, false);
                 }
                 else
                 {
-                    // Default reaction action if slot empty
-                    AddShield(10);
-                    ConsoleLogUI.Log($"[Event] Executed default defensive reaction: +10 Shield absorbed incoming hit!");
-                    yield return new WaitForSeconds(0.2f);
+                    ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): Condition '{condSyntax}' is TRUE, but no reaction action is slotted.");
+                    yield return new WaitForSeconds(0.1f);
+                }
+
+                if (editorUI != null)
+                {
+                    editorUI.HighlightLine(47, false);
                 }
             }
             else
@@ -182,13 +282,10 @@ namespace CodeForge.Combat
             }
         }
 
-        /// <summary>
-        /// Educational script method signature matching the PlayerCombat.cs editor scaffold.
-        /// </summary>
         public void OnTakeDamage(int incomingDamage)
         {
             var editorUI = FindAnyObjectByType<CodeEditorPanelUI>();
-            if (editorUI != null && editorUI.IsSection3Unlocked)
+            if (editorUI != null)
             {
                 StartCoroutine(HandleIncomingDamageReaction(incomingDamage, editorUI));
             }
@@ -198,17 +295,17 @@ namespace CodeForge.Combat
         {
             if (enemies == null || enemies.Count == 0) return null;
 
-            EnemyEntity selected = null;
+            List<EnemyEntity> living = new List<EnemyEntity>();
             for (int i = 0; i < enemies.Count; i++)
             {
                 var current = enemies[i];
-                if (current == null || current.IsDead) continue;
-                if (selected == null || current.CurrentHp < selected.CurrentHp)
+                if (current != null && !current.IsDead)
                 {
-                    selected = current;
+                    living.Add(current);
                 }
             }
-            return selected;
+            if (living.Count == 0) return null;
+            return living[Random.Range(0, living.Count)];
         }
 
         private IEnumerator PerformAttackLunge(Vector3 offset, float duration = 0.12f)

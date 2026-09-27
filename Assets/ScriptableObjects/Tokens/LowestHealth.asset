@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: LowestHealth
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: LowestHealth
-  tokenType: 3
+  tokenType: 0
   rarity: 2
   canSpawnAsReward: 1
   overrideSpawnChance: 0

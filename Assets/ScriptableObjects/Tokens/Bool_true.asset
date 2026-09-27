@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Bool_true
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Boolean True
-  tokenType: 2
+  tokenType: 1
   rarity: 3
   canSpawnAsReward: 1
   overrideSpawnChance: 0

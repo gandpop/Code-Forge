@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: HighestHealth
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: HighestHealth
-  tokenType: 3
+  tokenType: 0
   rarity: 2
   spawnChance: 50
   floatValue: 0

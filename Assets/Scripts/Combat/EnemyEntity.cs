@@ -40,8 +40,8 @@ namespace CodeForge.Combat
         {
             EnemyIntentType.Attack => $"[ATK {projectedValue}]",
             EnemyIntentType.HeavyHit => $"[HEAVY {projectedValue}]",
-            EnemyIntentType.Shield => $"[DEF {projectedValue}]",
-            EnemyIntentType.Charge => "[CHARGING!]",
+            EnemyIntentType.Shield => $"[SHIELD {projectedValue}]",
+            EnemyIntentType.Charge => projectedValue > 0 ? $"[CHARGING {projectedValue}]" : "[CHARGING!]",
             EnemyIntentType.Buff => $"[BUFF {projectedValue}]",
             _ => "[IDLE]"
         };
@@ -54,12 +54,36 @@ namespace CodeForge.Combat
         public float contactDamage = 10f;
         private CombatEntity playerTarget;
 
+        private Vector3 originalLocalPos;
+        private bool isLunging = false;
+
         public EnemyIntent CurrentIntent { get; private set; }
         public event Action<EnemyIntent> OnIntentChanged;
+
+        protected override void Awake()
+        {
+            base.Awake();
+            originalLocalPos = transform.localPosition;
+        }
+
+        private void Update()
+        {
+            if (CurrentIntent.intentType == EnemyIntentType.Charge && !IsDead && !isLunging)
+            {
+                float shakeX = (Mathf.PerlinNoise(Time.time * 30f, 0f) - 0.5f) * 0.12f;
+                float shakeY = (Mathf.PerlinNoise(0f, Time.time * 30f) - 0.5f) * 0.12f;
+                transform.localPosition = originalLocalPos + new Vector3(shakeX, shakeY, 0f);
+            }
+            else if (!isLunging && transform.localPosition != originalLocalPos)
+            {
+                transform.localPosition = originalLocalPos;
+            }
+        }
 
         public void Initialize(CombatEntity target)
         {
             playerTarget = target;
+            originalLocalPos = transform.localPosition;
             gameObject.SetActive(true);
             EnsureIntentPlateUI();
             RollNextIntent(1);
@@ -200,8 +224,7 @@ namespace CodeForge.Combat
 
                 case EnemyIntentType.Charge:
                     ConsoleLogUI.Log($"[Enemy] {gameObject.name} is gathering energy! [CHARGING!]");
-                    yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.15f, 0.1f, 0f), 0.2f));
-                    yield return new WaitForSeconds(0.2f);
+                    yield return new WaitForSeconds(0.4f);
                     break;
 
                 case EnemyIntentType.Shield:
@@ -222,6 +245,7 @@ namespace CodeForge.Combat
 
         private IEnumerator PerformAttackLunge(Vector3 offset, float duration = 0.12f)
         {
+            isLunging = true;
             Vector3 startPos = transform.position;
             Vector3 targetPos = startPos + offset;
 
@@ -242,6 +266,7 @@ namespace CodeForge.Combat
             }
 
             transform.position = startPos;
+            isLunging = false;
         }
     }
 }

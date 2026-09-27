@@ -60,22 +60,12 @@ namespace CodeForge.Combat
 
             if (codeEditorUI != null)
             {
-                codeEditorUI.SetProgressionState(currentRoomIndex);
                 codeEditorUI.SetInteractionLocked(false);
                 codeEditorUI.ResetAllHighlights();
 
                 if (player != null)
                 {
                     player.DamageMultiplier = codeEditorUI.GetDamageMultiplier();
-                    if (codeEditorUI.IsSection1Unlocked)
-                    {
-                        int baseShield = codeEditorUI.GetBaseShield();
-                        if (baseShield > 0)
-                        {
-                            player.AddShield(baseShield);
-                            ConsoleLogUI.Log($"[Stats] Applied baseShield +{baseShield} to Player.");
-                        }
-                    }
                 }
             }
 
@@ -96,6 +86,11 @@ namespace CodeForge.Combat
         {
             if (currentPhase != GamePhase.Planning) return;
 
+            if (codeEditorUI != null && !codeEditorUI.ValidatePreBattle())
+            {
+                return;
+            }
+
             if (codeEditorUI != null)
             {
                 codeEditorUI.SetInteractionLocked(true);
@@ -110,6 +105,15 @@ namespace CodeForge.Combat
         private IEnumerator CombatLoopCoroutine()
         {
             yield return new WaitForSeconds(0.2f);
+
+            // 0. Pre-Combat Lifecycle: Execute PlayerCombat.Start() block once before Round 1
+            if (player != null && !player.IsDead)
+            {
+                ConsoleLogUI.Log("[System] Executing PlayerCombat.Start() lifecycle initialization...");
+                var startContext = new CombatContext(player, activeEnemies, null, 0);
+                yield return StartCoroutine(player.ExecuteStartBlock(startContext, codeEditorUI));
+                yield return new WaitForSeconds(0.35f);
+            }
 
             int round = 1;
 
@@ -241,23 +245,23 @@ namespace CodeForge.Combat
             {
                 case 1:
                     // Room 1: "Hello World" (1x 15 HP Slime doing 3 DMG flat)
-                    SpawnEnemy("Training_Slime", new Vector3(2.4f, 1.0f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
+                    SpawnEnemy("Training_Slime", new Vector3(2.5f, 0.8f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
                     break;
 
                 case 2:
                     // Room 2: "The Variable Forge" (1x Shield Beetle, 30 HP, rotates: Turn 1 [SHIELD 12], Turn 2 [ATK 6])
-                    SpawnEnemy("Shield_Beetle", new Vector3(2.4f, 1.0f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Shield_Beetle", new Vector3(2.5f, 0.8f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
                     break;
 
                 case 3:
                     // Room 3: "The Reaction Test" (1x Golem Charger 45 HP; Turn 1 & 2 [CHARGE], Turn 3 [HEAVY 20])
-                    SpawnEnemy("Golem_Charger", new Vector3(2.4f, 1.0f, 0f), 45f, 20f, EnemyArchetype.GolemCharger);
+                    SpawnEnemy("Golem_Charger", new Vector3(2.5f, 0.8f, 0f), 45f, 20f, EnemyArchetype.GolemCharger);
                     break;
 
                 default:
                     // Scaling encounters beyond Room 3
                     float scale = 1f + (room - 3) * 0.25f;
-                    SpawnEnemy($"Slime_Elite_R{room}", new Vector3(1.6f, 0.7f, 0f), 25f * scale, 5f * scale, EnemyArchetype.Default);
+                    SpawnEnemy($"Slime_Elite_R{room}", new Vector3(1.6f, 0.4f, 0f), 25f * scale, 5f * scale, EnemyArchetype.Default);
                     SpawnEnemy($"Golem_Elite_R{room}", new Vector3(3.2f, 1.4f, 0f), 50f * scale, 15f * scale, EnemyArchetype.GolemCharger);
                     break;
             }

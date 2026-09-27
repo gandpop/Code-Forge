@@ -6,9 +6,13 @@ namespace CodeForge.UI
         Condition,
         ActionThen,
         ActionElse,
+        MaxHealth,
         DamageMultiplier,
         BaseShield,
+        AttackDamage,
+        DefendShield,
         ReactionCondition,
-        ReactionAction
+        ReactionAction,
+        [System.Obsolete] Stance
     }
 }

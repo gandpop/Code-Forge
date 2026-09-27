@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Int_3
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Integer
-  tokenType: 1
+  tokenType: 4
   rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0

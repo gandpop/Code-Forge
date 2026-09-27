@@ -9,24 +9,41 @@ namespace CodeForge.UI
 {
     public class CodeEditorPanelUI : MonoBehaviour
     {
-        [Header("Section 1: Class Fields (Unlocked Room 2+)")]
-        [SerializeField] private GameObject section1FieldsGroup;
-        [SerializeField] private GameObject section1LockedBanner;
+        [Header("Class Fields Sockets")]
+        [SerializeField] private CodeSocketUI maxHealthSocket;
         [SerializeField] private CodeSocketUI damageMultiplierSocket;
         [SerializeField] private CodeSocketUI baseShieldSocket;
 
-        [Header("Section 2: ExecuteTurn Method (Unlocked Room 1+)")]
-        [SerializeField] private GameObject section2ExecuteTurnGroup;
+        [Header("Modular Combat Methods Sockets")]
+        [SerializeField] private CodeSocketUI attackDamageSocket;
+        [SerializeField] private CodeSocketUI defendShieldSocket;
+
+        [Header("void Start() Sockets")]
+        [SerializeField] private CodeSocketUI stanceSocket;
+
+        [Header("ExecuteTurn Method Sockets")]
         [SerializeField] private CodeSocketUI targetSocket;
         [SerializeField] private CodeSocketUI conditionSocket;
         [SerializeField] private CodeSocketUI thenActionSocket;
         [SerializeField] private CodeSocketUI elseActionSocket;
 
-        [Header("Section 3: OnTakeDamage Callback (Unlocked Room 3+)")]
-        [SerializeField] private GameObject section3OnTakeDamageGroup;
-        [SerializeField] private GameObject section3LockedBanner;
+        [Header("OnTakeDamage Callback Sockets")]
         [SerializeField] private CodeSocketUI reactionConditionSocket;
         [SerializeField] private CodeSocketUI reactionActionSocket;
+
+        [Header("Default Pre-Slotted Tokens (Anti-Paralysis)")]
+        [SerializeField] private CodeTokenSO defaultMaxHealth;
+        [SerializeField] private CodeTokenSO defaultDamageMultiplier;
+        [SerializeField] private CodeTokenSO defaultBaseShield;
+        [SerializeField] private CodeTokenSO defaultAttackDamage;
+        [SerializeField] private CodeTokenSO defaultDefendShield;
+        [SerializeField] private StanceTokenSO defaultStance;
+        [SerializeField] private TargetingTokenSO defaultTarget;
+        [SerializeField] private ConditionTokenSO defaultCondition;
+        [SerializeField] private ActionTokenSO defaultThenAction;
+        [SerializeField] private ActionTokenSO defaultElseAction;
+        [SerializeField] private ConditionTokenSO defaultReactionCondition;
+        [SerializeField] private ActionTokenSO defaultReactionAction;
 
         [Header("Legacy Fallbacks (Preserves Scene References)")]
         [SerializeField] private CodeSocketUI attacksSocket;
@@ -44,15 +61,18 @@ namespace CodeForge.UI
         [Header("Starter Loadout")]
         [SerializeField] private List<CodeTokenSO> starterTokens = new List<CodeTokenSO>();
 
-        public bool IsSection1Unlocked { get; private set; } = false;
-        public bool IsSection3Unlocked { get; private set; } = false;
+        private Dictionary<int, EditorLineRowUI> lineRows = new Dictionary<int, EditorLineRowUI>();
 
         public CodeSocketUI TargetSocketUI => targetSocket != null ? targetSocket : targetingSocket;
         public CodeSocketUI ConditionSocketUI => conditionSocket != null ? conditionSocket : piercingSocket;
         public CodeSocketUI ThenActionSocketUI => thenActionSocket != null ? thenActionSocket : damageSocket;
         public CodeSocketUI ElseActionSocketUI => elseActionSocket != null ? elseActionSocket : multiplierSocket;
+        public CodeSocketUI MaxHealthSocketUI => maxHealthSocket;
         public CodeSocketUI DamageMultiplierSocketUI => damageMultiplierSocket;
         public CodeSocketUI BaseShieldSocketUI => baseShieldSocket;
+        public CodeSocketUI AttackDamageSocketUI => attackDamageSocket;
+        public CodeSocketUI DefendShieldSocketUI => defendShieldSocket;
+        public CodeSocketUI StanceSocketUI => stanceSocket;
         public CodeSocketUI ReactionConditionSocketUI => reactionConditionSocket;
         public CodeSocketUI ReactionActionSocketUI => reactionActionSocket;
 
@@ -65,8 +85,11 @@ namespace CodeForge.UI
 
             if (compileAndRunButton != null)
             {
+                compileAndRunButton.onClick.RemoveAllListeners();
                 compileAndRunButton.onClick.AddListener(() =>
                 {
+                    if (!ValidatePreBattle()) return;
+
                     if (CombatManager.Instance != null)
                     {
                         CombatManager.Instance.StartCombatExecution();
@@ -79,8 +102,12 @@ namespace CodeForge.UI
             RegisterSocket(ConditionSocketUI);
             RegisterSocket(ThenActionSocketUI);
             RegisterSocket(ElseActionSocketUI);
+            RegisterSocket(maxHealthSocket);
             RegisterSocket(damageMultiplierSocket);
             RegisterSocket(baseShieldSocket);
+            RegisterSocket(attackDamageSocket);
+            RegisterSocket(defendShieldSocket);
+            RegisterSocket(stanceSocket);
             RegisterSocket(reactionConditionSocket);
             RegisterSocket(reactionActionSocket);
         }
@@ -95,6 +122,8 @@ namespace CodeForge.UI
 
         private void Start()
         {
+            PrePopulateDefaultTokens();
+
             if (starterTokens != null)
             {
                 foreach (var token in starterTokens)
@@ -105,37 +134,25 @@ namespace CodeForge.UI
                     }
                 }
             }
+
+            // Register tokens with IntelliSense
+            if (IntelliSensePopoverUI.Instance != null)
+            {
+                if (starterTokens != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(starterTokens);
+                if (defaultMaxHealth != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(new CodeTokenSO[] { defaultMaxHealth });
+            }
         }
 
-        public void SetProgressionState(int roomIndex)
+        public void PrePopulateDefaultTokens()
         {
-            IsSection1Unlocked = roomIndex >= 2;
-            IsSection3Unlocked = roomIndex >= 3;
+            SlotDefaultIfEmpty(MaxHealthSocketUI, defaultMaxHealth);
+        }
 
-            // Section 1: Class Fields
-            if (section1FieldsGroup != null)
+        private void SlotDefaultIfEmpty(CodeSocketUI socket, CodeTokenSO defaultToken)
+        {
+            if (socket != null && socket.AssignedToken == null && defaultToken != null)
             {
-                section1FieldsGroup.SetActive(IsSection1Unlocked);
-            }
-            if (section1LockedBanner != null)
-            {
-                section1LockedBanner.SetActive(!IsSection1Unlocked);
-            }
-
-            // Section 2: ExecuteTurn (Always active)
-            if (section2ExecuteTurnGroup != null)
-            {
-                section2ExecuteTurnGroup.SetActive(true);
-            }
-
-            // Section 3: OnTakeDamage Callback
-            if (section3OnTakeDamageGroup != null)
-            {
-                section3OnTakeDamageGroup.SetActive(IsSection3Unlocked);
-            }
-            if (section3LockedBanner != null)
-            {
-                section3LockedBanner.SetActive(!IsSection3Unlocked);
+                socket.AssignToken(defaultToken);
             }
         }
 
@@ -144,18 +161,50 @@ namespace CodeForge.UI
             if (panelCanvasGroup != null)
             {
                 panelCanvasGroup.interactable = !locked;
-                panelCanvasGroup.alpha = locked ? 0.75f : 1.0f;
+                panelCanvasGroup.blocksRaycasts = !locked;
+                panelCanvasGroup.alpha = locked ? 0.85f : 1.0f;
+            }
+        }
+
+        private void CacheLineRows()
+        {
+            lineRows.Clear();
+            var rows = GetComponentsInChildren<EditorLineRowUI>(true);
+            foreach (var r in rows)
+            {
+                if (r != null) lineRows[r.lineNumber] = r;
+            }
+        }
+
+        public void HighlightLine(int line, bool active = true)
+        {
+            if (lineRows.Count == 0) CacheLineRows();
+            if (lineRows.TryGetValue(line, out var row) && row != null)
+            {
+                row.SetHighlight(active);
+            }
+        }
+
+        public void ClearAllLineHighlights()
+        {
+            if (lineRows.Count == 0) CacheLineRows();
+            foreach (var kvp in lineRows)
+            {
+                if (kvp.Value != null) kvp.Value.SetHighlight(false);
             }
         }
 
         public void ResetAllHighlights()
         {
+            ClearAllLineHighlights();
             ResetSocketHighlight(TargetSocketUI);
             ResetSocketHighlight(ConditionSocketUI);
             ResetSocketHighlight(ThenActionSocketUI);
             ResetSocketHighlight(ElseActionSocketUI);
+            ResetSocketHighlight(maxHealthSocket);
             ResetSocketHighlight(damageMultiplierSocket);
             ResetSocketHighlight(baseShieldSocket);
+            ResetSocketHighlight(stanceSocket);
             ResetSocketHighlight(reactionConditionSocket);
             ResetSocketHighlight(reactionActionSocket);
         }
@@ -188,6 +237,45 @@ namespace CodeForge.UI
                     text.text = $"{token.tokenName}\n<size=80%>{token.GetFormattedCodeString()}</size>";
                 }
             }
+
+            if (IntelliSensePopoverUI.Instance != null)
+            {
+                IntelliSensePopoverUI.Instance.RegisterAvailableTokens(new CodeTokenSO[] { token });
+            }
+        }
+
+        public bool RemoveTokenFromInventory(CodeTokenSO token)
+        {
+            if (token == null || tokenInventoryContainer == null) return false;
+
+            for (int i = 0; i < tokenInventoryContainer.childCount; i++)
+            {
+                var child = tokenInventoryContainer.GetChild(i);
+                var card = child.GetComponent<DraggableTokenCardUI>();
+                if (card != null && card.Token == token)
+                {
+                    child.SetParent(null);
+                    Destroy(child.gameObject);
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public List<CodeTokenSO> GetInventoryTokens()
+        {
+            var list = new List<CodeTokenSO>();
+            if (tokenInventoryContainer == null) return list;
+
+            for (int i = 0; i < tokenInventoryContainer.childCount; i++)
+            {
+                var card = tokenInventoryContainer.GetChild(i).GetComponent<DraggableTokenCardUI>();
+                if (card != null && card.Token != null)
+                {
+                    list.Add(card.Token);
+                }
+            }
+            return list;
         }
 
         public void AutoAssignToken(CodeTokenSO token)
@@ -197,24 +285,20 @@ namespace CodeForge.UI
             switch (token.tokenType)
             {
                 case CodeTokenType.Targeting:
-                    if (TargetSocketUI != null && TargetSocketUI.AssignedToken == null)
+                    if (TargetSocketUI != null)
                         TargetSocketUI.AssignToken(token);
                     break;
 
                 case CodeTokenType.Condition:
                     if (token is ConditionTokenSO condToken && condToken.subject == ConditionSubject.IncomingDamage)
                     {
-                        if (IsSection3Unlocked && reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                        if (reactionConditionSocket != null)
                             reactionConditionSocket.AssignToken(token);
-                        else if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
-                            ConditionSocketUI.AssignToken(token);
                     }
                     else
                     {
-                        if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
+                        if (ConditionSocketUI != null)
                             ConditionSocketUI.AssignToken(token);
-                        else if (IsSection3Unlocked && reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
-                            reactionConditionSocket.AssignToken(token);
                     }
                     break;
 
@@ -223,25 +307,41 @@ namespace CodeForge.UI
                         ThenActionSocketUI.AssignToken(token);
                     else if (ElseActionSocketUI != null && ElseActionSocketUI.AssignedToken == null)
                         ElseActionSocketUI.AssignToken(token);
-                    else if (IsSection3Unlocked && reactionActionSocket != null && reactionActionSocket.AssignedToken == null)
+                    else if (reactionActionSocket != null)
                         reactionActionSocket.AssignToken(token);
+                    else if (ThenActionSocketUI != null)
+                        ThenActionSocketUI.AssignToken(token);
                     break;
 
                 case CodeTokenType.Float:
-                    if (IsSection1Unlocked && damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken == null)
+                    if (damageMultiplierSocket != null)
                         damageMultiplierSocket.AssignToken(token);
                     break;
 
                 case CodeTokenType.Int:
-                    if (IsSection1Unlocked && baseShieldSocket != null && baseShieldSocket.AssignedToken == null)
+                    if (baseShieldSocket != null)
                         baseShieldSocket.AssignToken(token);
+                    break;
+
+                case CodeTokenType.Stance:
+                    if (stanceSocket != null)
+                        stanceSocket.AssignToken(token);
                     break;
             }
         }
 
+        public int GetMaxHealth()
+        {
+            if (maxHealthSocket != null && maxHealthSocket.AssignedToken != null)
+            {
+                return Mathf.Max(5, maxHealthSocket.AssignedToken.intValue);
+            }
+            return 20;
+        }
+
         public float GetDamageMultiplier()
         {
-            if (IsSection1Unlocked && damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken != null)
+            if (damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken != null)
             {
                 return damageMultiplierSocket.AssignedToken.floatValue > 0f ? damageMultiplierSocket.AssignedToken.floatValue : 1.0f;
             }
@@ -250,11 +350,58 @@ namespace CodeForge.UI
 
         public int GetBaseShield()
         {
-            if (IsSection1Unlocked && baseShieldSocket != null && baseShieldSocket.AssignedToken != null)
+            if (baseShieldSocket != null && baseShieldSocket.AssignedToken != null)
             {
                 return Mathf.Max(0, baseShieldSocket.AssignedToken.intValue);
             }
             return 0;
+        }
+
+        public int GetAttackDamage()
+        {
+            if (attackDamageSocket != null && attackDamageSocket.AssignedToken != null)
+            {
+                return Mathf.Max(1, attackDamageSocket.AssignedToken.intValue);
+            }
+            return 8;
+        }
+
+        public int GetDefendShield()
+        {
+            if (defendShieldSocket != null && defendShieldSocket.AssignedToken != null)
+            {
+                return Mathf.Max(1, defendShieldSocket.AssignedToken.intValue);
+            }
+            return 5;
+        }
+
+        public bool ValidatePreBattle()
+        {
+            var requiredSockets = new (CodeSocketUI socket, string name)[]
+            {
+                (maxHealthSocket, "maxHealth"),
+                (attackDamageSocket, "Attack.damage"),
+                (thenActionSocket, "ExecuteTurn.thenAction")
+            };
+
+            foreach (var req in requiredSockets)
+            {
+                if (req.socket == null || req.socket.AssignedToken == null)
+                {
+                    ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] CS0165: Use of unassigned variable '{req.name}'. Please assign a token before compiling!</color>");
+                    if (req.socket != null)
+                    {
+                        req.socket.TriggerUnassignedPulsingHighlight();
+                    }
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        public StanceTokenSO GetStanceToken()
+        {
+            return stanceSocket != null ? stanceSocket.AssignedToken as StanceTokenSO : null;
         }
 
         public TargetingTokenSO GetTargetingToken()
@@ -283,14 +430,12 @@ namespace CodeForge.UI
 
         public ConditionTokenSO GetReactionConditionToken()
         {
-            if (!IsSection3Unlocked || reactionConditionSocket == null) return null;
-            return reactionConditionSocket.AssignedToken as ConditionTokenSO;
+            return reactionConditionSocket != null ? reactionConditionSocket.AssignedToken as ConditionTokenSO : null;
         }
 
         public ActionTokenSO GetReactionActionToken()
         {
-            if (!IsSection3Unlocked || reactionActionSocket == null) return null;
-            return reactionActionSocket.AssignedToken as ActionTokenSO;
+            return reactionActionSocket != null ? reactionActionSocket.AssignedToken as ActionTokenSO : null;
         }
     }
 }

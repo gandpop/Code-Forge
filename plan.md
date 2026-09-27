@@ -1,134 +1,151 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v3.0)
-## Project: CodeForge — Unity C# Programming Roguelike
+# ARCHITECTURAL PLAN & SPECIFICATION (v7.0)
+## Project: CodeForge — Minimalist Starter Economy & Pure Assembly
 
 ---
 
-## 1. Core Vision & Progression Flow
-* **Target Audience:** Novice C# and Unity learners trapped in "Tutorial Hell" who struggle with independent problem-solving, architectural thinking, and understanding execution flow.
-* **Core Metaphor:** The player is writing a real Unity `MonoBehaviour` script (`PlayerCombat.cs`). 
-  - **Left Half (IDE View):** Dark-mode C# script editor with syntax highlighting and horizontal inline sockets.
-  - **Right Half (Game View):** Classic dungeon crawler roguelike combat arena.
-* **Pacing & Progressive Unlocking (Rooms 1–3):**
-  - **Room 1: The Method (`ExecuteTurn`)** — Learn basic targeting and conditional execution.
-  - **Room 2: The Variables (`Class Fields`)** — Learn data types (`float`, `int`) for stats (damage multiplier, base shield).
-  - **Room 3: The Event Callback (`OnTakeDamage`)** — Learn event-driven programming (reacting to incoming damage).
-  - **Room 4+: Infinite / Scaling Roguelike** — Full build crafting with synergies, elite enemies, and rare/legendary token drafts.
+## 1. Executive Summary & Design Pivot
+* **The "Zero-Bloat" Starter Loop:** The player starts with **only `maxHealth = 20` pre-slotted**. All other sockets start **completely empty**.
+* **Minimal Starter Shelf:** The player is given exactly **two tokens** in their starting inventory:
+  1. `1x Int Token` (`Int 8`) $\rightarrow$ to be slotted into `Attack(target)`'s `damage` socket.
+  2. `1x Action Token` (`Attack(target);`) $\rightarrow$ to be slotted into `ExecuteTurn()`'s action socket.
+* **Safe Unslotted Defaults:** Empty sockets do not crash or halt compilation; they resolve to clean, safe fallbacks:
+  - Empty `damageMultiplier` $\rightarrow$ defaults to `1.0f`
+  - Empty `baseShield` $\rightarrow$ defaults to `0`
+  - Empty `target` $\rightarrow$ defaults to `Enemies.Random()`
+  - Empty `condition` $\rightarrow$ defaults to `true` (unconditional execution)
+  - Empty `elseAction` $\rightarrow$ does nothing
+  - Empty `OnTakeDamage` $\rightarrow$ does nothing
+* **Enemy Fixes:** Revert charging position animation to prevent sprite drift and enemy overlap. Ensure fixed, clean horizontal/diagonal spacing for all room spawns.
+* **Token Pruning:** Delete all pre-baked stat actions (`player.AddShield(10)`, `target.TakeDamage(14)`), duplicate `Int 20` tokens, and deprecated Stance assets.
 
 ---
 
-## 2. The Script Architecture (`PlayerCombat.cs`)
-
-The left-side editor represents a single cohesive Unity script:
+## 2. Updated Script Architecture (`PlayerCombat.cs`)
 
 ```csharp
+using UnityEngine;
+using System.Collections.Generic;
+
 public class PlayerCombat : MonoBehaviour
 {
     // ========================================================
-    // SECTION 1: CLASS FIELDS (Unlocked after Room 1)
+    // SECTION 1: STATS (Only maxHealth starts pre-slotted)
     // ========================================================
     [Header("Stats")]
-    public float damageMultiplier = [ FLOAT_SOCKET ]; // e.g. 1.25f
-    public int   baseShield       = [ INT_SOCKET   ]; // e.g. 8
+    public int   maxHealth        = [ 20 ];          // Pre-slotted starter
+    public float damageMultiplier = [ EMPTY -> 1.0f ]; // Empty default: 1.0x
+    public int   baseShield       = [ EMPTY -> 0    ]; // Empty default: 0
 
     // ========================================================
-    // SECTION 2: MAIN TURN METHOD (Unlocked Room 1)
+    // SECTION 2: MODULAR COMBAT METHODS (Abilities)
+    // ========================================================
+    public void Attack(Enemy target)
+    {
+        int damage = [ INT_SOCKET ]; // Slot starter 'Int 8' here!
+        target.TakeDamage(damage);
+    }
+
+    public void Defend()
+    {
+        int shield = [ INT_SOCKET ]; // Empty at start; unlock tokens later
+        player.AddShield(shield);
+    }
+
+    // ========================================================
+    // SECTION 3: LIFECYCLE INITIALIZATION
+    // ========================================================
+    void Start()
+    {
+        player.SetMaxHealth(maxHealth);
+        player.AddStartingShield(baseShield);
+    }
+
+    // ========================================================
+    // SECTION 4: MAIN TURN METHOD
     // ========================================================
     public void ExecuteTurn()
     {
-        var target = [ TARGET_SOCKET ];
+        var target = [ TARGET_SOCKET ]; // Defaults to Enemies.Random() if empty
 
-        if ( [ CONDITION_SOCKET ] )
+        if ( [ CONDITION_SOCKET ] )    // Defaults to 'true' if empty
         {
-            [ ACTION_THEN_SOCKET ];
+            [ ACTION_THEN_SOCKET ];    // Slot starter 'Attack(target);' here!
         }
         else
         {
-            [ ACTION_ELSE_SOCKET ];
+            [ ACTION_ELSE_SOCKET ];    // Empty default: no-op
         }
     }
 
     // ========================================================
-    // SECTION 3: EVENT CALLBACK (Unlocked after Room 2)
+    // SECTION 5: EVENT CALLBACK (Defense on Enemy Turn)
     // ========================================================
     public void OnTakeDamage(int incomingDamage)
     {
-        if ( [ REACTION_CONDITION_SOCKET ] ) // e.g. incomingDamage >= 8
+        if ( [ REACTION_COND_SOCKET ] )
         {
-            [ REACTION_ACTION_SOCKET ];     // e.g. player.AddShield(12)
+            [ REACTION_ACTION_SOCKET ]; // Empty at start; unlock tokens later
         }
     }
 }
 ```
 
-*Note: In Room 1, Sections 1 & 3 are grayed out with inline comments:*
-`// TODO: Clear Room 1 to unlock Class Fields`
-`// TODO: Clear Room 2 to unlock Event Callbacks`
+---
+
+## 3. Starter Token Shelf & Inventory
+
+The player begins Room 1 with **ONLY** these 2 tokens in their inventory shelf:
+1. `Int_8` (`int`: 8)
+2. `Action_AttackTarget` (`action`: `Attack(target);`)
+
+### What the Player Does on Turn 0:
+1. Drags `Int 8` into `Attack(target) { int damage = [ 8 ]; }`.
+2. Drags `Attack(target);` into `ExecuteTurn() { [ Attack(target); ] }`.
+3. Hits **COMPILE & BATTLE**.
+4. Defeats Room 1's Training Slime (15 HP) in 2–3 rounds!
+5. **Reward Screen:** Drafts their first new tokens (e.g. `Defend();`, `Condition_ShieldCheck`, `Int 10`, or `Float 1.3`).
 
 ---
 
-## 3. Data Layer Specifications (`CodeForge.Data`)
+## 4. Token Cleanup List (`Assets/ScriptableObjects/Tokens/`)
 
-### 3.1 Token Typings
-* `Float`: Assigned to `damageMultiplier` or threshold values (e.g. `1.25f`, `1.5f`, `2.0f`).
-* `Int`: Assigned to `baseShield` or flat numeric fields (e.g. `5`, `10`, `15`).
-* `Targeting`: Plugged into `var target = [ ... ]` (e.g., `Enemies.LowestHP()`, `Enemies.TargetAttacker()`).
-* `Condition`: Boolean expressions (e.g., `target.HealthPercent <= 0.30f`, `target.IsShielded == true`, `incomingDamage >= 8`).
-* `Action`: Executable combat abilities (e.g., `target.TakeDamage(7)`, `target.PierceDamage(8)`, `player.AddShield(10)`).
-
----
-
-## 4. UI Ergonomics & Readability Specifications (`CodeForge.UI`)
-
-1. **Horizontal Inline Sockets:**
-   * Sockets must be formatted as **horizontal inline capsules** matching text line height (`Height: ~32-36px`, `Width: auto-expand / min 160px`).
-   * Eliminates the awkward vertical clipping (`[ Drop Tar... ]`).
-2. **Visual Section Headers:**
-   * Foldout or distinct card containers for:
-     1. `Variables & Stats`
-     2. `ExecuteTurn()`
-     3. `OnTakeDamage()`
-3. **Execution Trace Feedback:**
-   * When `COMPILE & BATTLE` runs:
-     - Active lines glow green sequentially.
-     - Evaluated conditions pulse Green (`true`) or Red (`false`).
-     - Chosen branch stays bright while unchosen branch dims.
+Delete or purge from reward pool:
+- ❌ All Stance assets: `Stance_Balanced`, `Stance_Berserk`, `Stance_Guardian`
+- ❌ Hardcoded action assets: `Action_DefensiveGuard` (since `Defend()` replaces it), `Action_HeavyStrike`
+- ❌ Duplicate `Int_20` tokens (keep only one in project for `maxHealth`)
+- Keep modular actions: `Action_AttackTarget` (`Attack(target);`), `Action_Defend` (`Defend();`), `Action_PierceTarget` (`target.PierceDamage(8);`)
 
 ---
 
-## 5. Room & Enemy Progression
+## 5. Enemy Positioning & Animation Fixes (`CodeForge.Combat`)
 
-| Room | Title & Theme | Enemy Setup | Educational Focus | Unlock / Reward |
-| :--- | :--- | :--- | :--- | :--- |
-| **Room 1** | **"Hello World"** | 1x Training Slime (15 HP, 3 DMG flat) | Syntax of `ExecuteTurn()`, Target resolution, `if/else` | **Unlocks Section 1: Class Fields** + drafts 1 Float / 1 Int token |
-| **Room 2** | **"The Variable Forge"** | 1x Shield Beetle (30 HP, rotates `[DEF 12]` / `[ATK 6]`) | How fields modify stats (`damageMultiplier`), bypassing shield with conditions | **Unlocks Section 3: `OnTakeDamage`** + drafts 1 Reaction token |
-| **Room 3** | **"The Reaction Test"** | 1x Golem Charger (45 HP, charges 2 turns, hits for 20 DMG) | Event-driven defense: absorbing heavy hits via `OnTakeDamage()` | **Full Roguelike Unlocked** |
-| **Room 4+**| **Scaling Dungeon** | Mixed swarms, glass cannons, elite tanks | Full build optimization (Thorns, Crit, Glass Cannon) | Rare / Epic / Legendary Token drafts |
+1. **Revert Charge Lunge Drift:**
+   * Remove `PerformAttackLunge` from `EnemyIntentType.Charge` in `EnemyEntity.cs`. Charging enemies stay firmly in their spawn positions without position offsets.
+2. **Fixed Enemy Spawn Spacing:**
+   * Ensure enemy spawn coordinates in `CombatManager.cs` are spaced so bounding boxes and intent plates never overlap:
+     - Single enemy (Rooms 1–3): `Vector3(2.5f, 0.8f, 0f)`
+     - Two enemies (Room 4+):
+       - Frontliner: `Vector3(1.6f, 0.4f, 0f)`
+       - Backliner: `Vector3(3.2f, 1.4f, 0f)`
+3. **Intent Plate Visibility:**
+   * Intent badges render above the enemy cube with clear z-sorting so they never occlude adjacent enemies.
 
 ---
 
 ## 6. Implementation Milestones for Architect Agent
 
-### Milestone 1: Progressive Room Unlock System
-- [ ] Implement `RoomProgressionManager` (tracks current room index: 1, 2, 3, 4+).
-- [ ] In `CodeEditorPanelUI`:
-  - Room 1: Only `ExecuteTurn()` is active. Fields and `OnTakeDamage` show commented locked state.
-  - Room 2: Unlocks `Class Fields` UI block.
-  - Room 3: Unlocks `OnTakeDamage()` UI block.
+### Milestone 1: Enemy Spawning & Position Fix
+- [ ] Remove charge lunge drift from `EnemyEntity.cs`.
+- [ ] Adjust enemy spawn offsets in `CombatManager.cs` so enemies never overlap.
 
-### Milestone 2: Class Fields & Variable Binding
-- [ ] Add `damageMultiplier` (Float) and `baseShield` (Int) sockets to `CodeEditorPanelUI`.
-- [ ] Connect values directly to `PlayerCombatController`:
-  - `damageMultiplier` scales all player attacks.
-  - `baseShield` gives starting armor at the beginning of each room.
+### Milestone 2: Empty Socket Fallbacks
+- [ ] Ensure all sockets except `maxHealth` start completely empty.
+- [ ] Implement safe fallbacks for empty sockets: `damageMultiplier = 1.0f`, `baseShield = 0`, `target = Random`, `condition = true`, `else = null`.
 
-### Milestone 3: Event-Driven `OnTakeDamage` Method
-- [ ] Implement `OnTakeDamage(int incomingDamage)` in `PlayerCombatController`:
-  - Triggers right before player HP is depleted during enemy attack turns.
-  - Evaluates reaction condition (e.g., `incomingDamage >= 8`).
-  - If true, executes defensive reaction action (e.g., `player.AddShield(10)`).
-- [ ] Add educational console log:
-  `[Event] OnTakeDamage(12) triggered! Condition 'incomingDamage >= 8' is TRUE -> Executed player.AddShield(10).`
+### Milestone 3: Starter Inventory Pruning
+- [ ] Configure `starterTokens` in `CodeEditorPanelUI` to provide ONLY: `Int 8` and `Action_AttackTarget`.
+- [ ] Pre-populate ONLY `maxHealth = 20`.
 
-### Milestone 4: UI Horizontal Layout & Typography Polish
-- [ ] Restructure all `CodeSocketUI` elements into horizontal inline pills to eliminate text clipping.
-- [ ] Ensure empty states render as clean dashed outlines (`[ Drop Condition ]`).
+### Milestone 4: Asset & Token Pool Cleanup
+- [ ] Delete deprecated Stance tokens and hardcoded stat action tokens (`Action_DefensiveGuard`, duplicate `Int 20`).
+- [ ] Verify reward generation only drops valid modular actions (`Attack(target);`, `Defend();`, `Pierce(target);`), integers, floats, conditions, and targeting rules.

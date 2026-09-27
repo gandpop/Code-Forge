@@ -75,10 +75,10 @@ namespace CodeForge.UI
             {
                 string coloredBadge = intent.intentType switch
                 {
-                    EnemyIntentType.Attack => $"<color=#FF6B6B><b>{intent.GetBadgeText()}</b></color>",
-                    EnemyIntentType.HeavyHit => $"<color=#FF3333><b>{intent.GetBadgeText()}</b></color>",
-                    EnemyIntentType.Shield => $"<color=#4DABF7><b>{intent.GetBadgeText()}</b></color>",
-                    EnemyIntentType.Charge => $"<color=#FFD43B><b>{intent.GetBadgeText()}</b></color>",
+                    EnemyIntentType.Attack => $"<color=#FF4444><b>{intent.GetBadgeText()}</b></color>",
+                    EnemyIntentType.HeavyHit => $"<color=#FF4444><b>{intent.GetBadgeText()}</b></color>",
+                    EnemyIntentType.Shield => $"<color=#44AAFF><b>{intent.GetBadgeText()}</b></color>",
+                    EnemyIntentType.Charge => $"<color=#FFDD44><b>{intent.GetBadgeText()}</b></color>",
                     EnemyIntentType.Buff => $"<color=#FFA94D><b>{intent.GetBadgeText()}</b></color>",
                     _ => $"<color=#CCCCCC><b>{intent.GetBadgeText()}</b></color>"
                 };

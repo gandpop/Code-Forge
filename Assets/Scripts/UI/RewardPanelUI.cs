@@ -91,7 +91,7 @@ namespace CodeForge.UI
                 ConsoleLogUI.Log("[Unlock] Clear Room 2 complete! Unlocked Section 3: Event Callback OnTakeDamage(int incomingDamage)!");
                 // Room 2 Reward Draft: 1 Reaction condition, 1 Defensive action, 1 other token
                 var reactionCond = eligibleTokens.Find(t => t is ConditionTokenSO c && c.subject == ConditionSubject.IncomingDamage);
-                var defAction = eligibleTokens.Find(t => t.name.Contains("Defensive") || t.GetFormattedCodeString().Contains("AddShield"));
+                var defAction = eligibleTokens.Find(t => t.name.Contains("Defend") || t.GetFormattedCodeString().Contains("Defend") || t.GetFormattedCodeString().Contains("AddShield"));
 
                 if (reactionCond != null) { draftedTokens.Add(reactionCond); eligibleTokens.Remove(reactionCond); }
                 if (defAction != null) { draftedTokens.Add(defAction); eligibleTokens.Remove(defAction); }

@@ -9,6 +9,8 @@ namespace CodeForge.Data
         public CodeTokenType tokenType;
         [TextArea(1, 3)]
         public string codeDisplaySyntax;
+        [TextArea(2, 4)]
+        public string description;
 
         [Header("Numeric Values (for Float / Int tokens)")]
         public float floatValue = 1.0f;
