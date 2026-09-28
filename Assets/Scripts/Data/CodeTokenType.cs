@@ -7,7 +7,8 @@ namespace CodeForge.Data
         Action = 2,     // Executes a combat ability (Offense, Defense, Utility)
         Float = 3,      // Numeric float constant / multiplier
         Int = 4,        // Numeric integer constant / stat
-        Stance = 5      // Player combat stance (Start method)
+        Stance = 5,     // Player combat stance (Start method)
+        Bool = 6        // Boolean value (true / false)
     }
 }
 

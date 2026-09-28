@@ -44,9 +44,19 @@ namespace CodeForge.Data
                 case ActionCategory.Attack:
                     yield return context.Player.PerformAttackAnimation();
 
+                    bool isCrit = context.Player != null && context.Player.CritChance > 0f && (Random.value < context.Player.CritChance);
+                    int critBonus = isCrit ? context.Player.CritDamage : 0;
+                    float baseWithCrit = actionValue + critBonus;
                     float mult = context.Player != null ? context.Player.DamageMultiplier : 1.0f;
-                    float effectiveDamage = actionValue * mult;
-                    string multText = mult != 1.0f ? $" (Base {actionValue} * {mult}x = {effectiveDamage} DMG)" : $" for {effectiveDamage} DMG";
+                    float finalDamage = baseWithCrit * mult;
+
+                    string critSuffix = isCrit ? $" (+{critBonus} CRIT BONUS)" : "";
+                    string multText = mult != 1.0f ? $" (Base {actionValue}{critSuffix} * {mult}x = {finalDamage} DMG)" : (isCrit ? $" for {finalDamage} DMG{critSuffix}" : $" for {finalDamage} DMG");
+
+                    if (isCrit)
+                    {
+                        ConsoleLogUI.Log($"<color=#E5C07B>[Combat] CRITICAL STRIKE! Dealt {Mathf.RoundToInt(finalDamage)} DMG (+{critBonus} crit bonus)!</color>");
+                    }
 
                     if (isAreaOfEffect)
                     {
@@ -56,7 +66,11 @@ namespace CodeForge.Data
                             var enemy = context.ActiveEnemies[i];
                             if (enemy != null && !enemy.IsDead)
                             {
-                                enemy.TakeDamage(effectiveDamage, isPiercing);
+                                enemy.TakeDamage(finalDamage, isPiercing);
+                                if (editorUI != null && editorUI.GetApplyBleed())
+                                {
+                                    enemy.ApplyBleed(editorUI.GetBleedDamage(), editorUI.GetBleedDuration());
+                                }
                             }
                         }
                     }
@@ -66,7 +80,12 @@ namespace CodeForge.Data
                         if (target != null && !target.IsDead)
                         {
                             ConsoleLogUI.Log($"[Action] Executing '{GetFormattedCodeString()}' on {target.name}{multText}{(isPiercing ? " (Piercing)" : "")}!");
-                            target.TakeDamage(effectiveDamage, isPiercing);
+                            target.TakeDamage(finalDamage, isPiercing);
+
+                            if (editorUI != null && editorUI.GetApplyBleed())
+                            {
+                                target.ApplyBleed(editorUI.GetBleedDamage(), editorUI.GetBleedDuration());
+                            }
                         }
                         else
                         {

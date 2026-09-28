@@ -12,9 +12,10 @@ namespace CodeForge.Data
         [TextArea(2, 4)]
         public string description;
 
-        [Header("Numeric Values (for Float / Int tokens)")]
+        [Header("Numeric & Boolean Values")]
         public float floatValue = 1.0f;
         public int intValue = 0;
+        public bool boolValue = false;
 
         [Header("Rarity Settings (Spawn chance is linked to Rarity)")]
         public TokenRarity rarity = TokenRarity.Common;
@@ -76,6 +77,10 @@ namespace CodeForge.Data
             if (!string.IsNullOrEmpty(codeDisplaySyntax))
             {
                 return codeDisplaySyntax;
+            }
+            if (tokenType == CodeTokenType.Bool)
+            {
+                return boolValue ? "true" : "false";
             }
             if (tokenType == CodeTokenType.Float)
             {

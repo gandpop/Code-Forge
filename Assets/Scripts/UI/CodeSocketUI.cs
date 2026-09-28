@@ -20,6 +20,8 @@ namespace CodeForge.UI
         [SerializeField] private CodeEditorPanelUI codeEditorUI;
 
         public CodeTokenSO AssignedToken { get; private set; }
+        public CodeSocketRole SocketRole => socketRole;
+        public CodeTokenType ExpectedType => expectedType;
         public CodeEditorPanelUI EditorUI => codeEditorUI != null ? codeEditorUI : (codeEditorUI = GetComponentInParent<CodeEditorPanelUI>() ?? Object.FindFirstObjectByType<CodeEditorPanelUI>());
         private bool isHighlightActive = false;
 
@@ -38,6 +40,7 @@ namespace CodeForge.UI
                 {
                     CodeTokenType.Int => 60f,
                     CodeTokenType.Float => 80f,
+                    CodeTokenType.Bool => 70f,
                     CodeTokenType.Stance => 160f,
                     CodeTokenType.Targeting => 180f,
                     CodeTokenType.Condition => 220f,
@@ -129,7 +132,7 @@ namespace CodeForge.UI
             var draggedCard = eventData.pointerDrag?.GetComponent<DraggableTokenCardUI>();
             if (draggedCard == null || draggedCard.Token == null) return;
 
-            if (draggedCard.Token.tokenType != expectedType)
+            if (!IsTypeCompatible(draggedCard.Token.tokenType, expectedType))
             {
                 LogTypeMismatchError(draggedCard.Token, expectedType);
                 return;
@@ -143,6 +146,14 @@ namespace CodeForge.UI
             AssignToken(draggedCard.Token);
             draggedCard.NotifyDropAccepted();
             ConsoleLogUI.Log($"[Syntax] Assigned {draggedCard.Token.GetFormattedCodeString()} to {socketRole}.");
+        }
+
+        public static bool IsTypeCompatible(CodeTokenType incomingType, CodeTokenType expected)
+        {
+            if (incomingType == expected) return true;
+            if (expected == CodeTokenType.Bool && incomingType == CodeTokenType.Condition) return true;
+            if (expected == CodeTokenType.Condition && incomingType == CodeTokenType.Bool) return true;
+            return false;
         }
 
         public void UnslotToken()
@@ -163,7 +174,7 @@ namespace CodeForge.UI
 
         public void AssignToken(CodeTokenSO token)
         {
-            if (token != null && token.tokenType != expectedType)
+            if (token != null && !IsTypeCompatible(token.tokenType, expectedType))
             {
                 LogTypeMismatchError(token, expectedType);
                 return;
@@ -187,6 +198,7 @@ namespace CodeForge.UI
                     CodeTokenType.Action => $"<color=#DCDCAA>{syntax}</color>",
                     CodeTokenType.Float => $"<color=#B5CEA8>{syntax}</color>",
                     CodeTokenType.Int => $"<color=#B5CEA8>{syntax}</color>",
+                    CodeTokenType.Bool => $"<color=#569CD6>{syntax}</color>",
                     CodeTokenType.Stance => $"<color=#4EC9B0>{syntax}</color>",
                     _ => $"<color=#D4D4D4>{syntax}</color>"
                 };
@@ -202,6 +214,7 @@ namespace CodeForge.UI
                     CodeTokenType.Action => "<color=#6E6E6E>[ <color=#DCDCAA>action</color> ]</color>",
                     CodeTokenType.Float => "<color=#6E6E6E>[ <color=#B5CEA8>float</color> ]</color>",
                     CodeTokenType.Int => "<color=#6E6E6E>[ <color=#B5CEA8>int</color> ]</color>",
+                    CodeTokenType.Bool => "<color=#6E6E6E>[ <color=#569CD6>bool</color> ]</color>",
                     CodeTokenType.Stance => "<color=#6E6E6E>[ <color=#4EC9B0>stance</color> ]</color>",
                     _ => "<color=#6E6E6E>[ select ]</color>"
                 };
@@ -298,6 +311,52 @@ namespace CodeForge.UI
                 SetHighlight(pulseColor, true, 1.0f);
                 yield return null;
             }
+            SetHighlight(Color.white, false, 1.0f);
+        }
+
+        public void InitializeRuntime(CodeSocketRole role, CodeTokenType expected, CodeEditorPanelUI editor)
+        {
+            socketRole = role;
+            expectedType = expected;
+            codeEditorUI = editor;
+
+            if (socketOutline == null) socketOutline = GetComponent<Outline>();
+            if (socketCanvasGroup == null) socketCanvasGroup = GetComponent<CanvasGroup>();
+            if (socketValueText == null) socketValueText = GetComponentInChildren<TextMeshProUGUI>();
+            if (socketButton == null) socketButton = GetComponent<Button>();
+
+            var layout = GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.minHeight = 20f;
+                layout.preferredHeight = 20f;
+                layout.preferredWidth = expectedType switch
+                {
+                    CodeTokenType.Int => 60f,
+                    CodeTokenType.Float => 80f,
+                    CodeTokenType.Bool => 70f,
+                    CodeTokenType.Stance => 160f,
+                    CodeTokenType.Targeting => 180f,
+                    CodeTokenType.Condition => 220f,
+                    CodeTokenType.Action => 190f,
+                    _ => 150f
+                };
+                layout.minWidth = layout.preferredWidth;
+            }
+
+            if (socketValueText != null)
+            {
+                socketValueText.textWrappingMode = TextWrappingModes.NoWrap;
+                socketValueText.overflowMode = TextOverflowModes.Ellipsis;
+            }
+
+            if (socketButton != null)
+            {
+                socketButton.onClick.RemoveAllListeners();
+                socketButton.onClick.AddListener(OnSocketClicked);
+            }
+
+            RefreshDisplay();
             SetHighlight(Color.white, false, 1.0f);
         }
     }

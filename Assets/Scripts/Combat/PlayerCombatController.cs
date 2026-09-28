@@ -10,8 +10,11 @@ namespace CodeForge.Combat
     {
         [Header("Script Bound Stats")]
         public int MaxHealth { get; set; } = 20;
-        public float DamageMultiplier { get; set; } = 1.2f;
+        public float DamageMultiplier { get; set; } = 1.0f;
         public int BaseShield { get; set; } = 0;
+        public float CritChance { get; set; } = 0.0f;
+        public int CritDamage { get; set; } = 0;
+        public float EvasionChance { get; set; } = 0.0f;
         [System.Obsolete] public PlayerStance CurrentStance { get; private set; } = PlayerStance.Balanced;
         [System.Obsolete] public StanceTokenSO SlottedStanceToken { get; private set; }
         public float EffectiveDamageMultiplier => Mathf.Max(0.1f, DamageMultiplier);
@@ -60,21 +63,44 @@ namespace CodeForge.Combat
             int maxHealth = editorUI.GetMaxHealth();
             int startingShield = editorUI.GetBaseShield();
             float dmgMult = editorUI.GetDamageMultiplier();
+            CritChance = editorUI.GetCritChance();
+            CritDamage = editorUI.GetCritDamage();
+            EvasionChance = editorUI.GetEvasionChance();
+            DamageMultiplier = dmgMult;
 
-            // Line 25: player.SetMaxHealth(maxHealth);
+            // Highlight line: player.SetMaxHealth(maxHealth);
+            editorUI.HighlightSocketRow(editorUI.MaxHealthSocketUI, true);
             editorUI.HighlightLine(25, true);
             SetMaxHealth(maxHealth);
             yield return new WaitForSeconds(0.2f);
+            editorUI.HighlightSocketRow(editorUI.MaxHealthSocketUI, false);
             editorUI.HighlightLine(25, false);
 
-            // Line 26: player.AddStartingShield(baseShield);
+            // Highlight line: player.AddStartingShield(baseShield);
+            editorUI.HighlightSocketRow(editorUI.BaseShieldSocketUI, true);
             editorUI.HighlightLine(26, true);
             AddStartingShield(startingShield);
             yield return new WaitForSeconds(0.2f);
+            editorUI.HighlightSocketRow(editorUI.BaseShieldSocketUI, false);
             editorUI.HighlightLine(26, false);
 
-            ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x");
+            string critStr = CritChance > 0f ? $", Crit={CritChance * 100:0}% (+{CritDamage})" : "";
+            string evaStr = EvasionChance > 0f ? $", Evasion={EvasionChance * 100:0}%" : "";
+            ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x{critStr}{evaStr}");
             yield return new WaitForSeconds(0.2f);
+        }
+
+        public override void TakeDamage(float amount, bool isPiercing = false)
+        {
+            if (IsDead) return;
+
+            if (EvasionChance > 0f && UnityEngine.Random.value < EvasionChance)
+            {
+                ConsoleLogUI.Log($"<color=#98C379>[Combat] Player DODGED the incoming attack! (Evasion: {EvasionChance * 100:0}%)</color>");
+                return;
+            }
+
+            base.TakeDamage(amount, isPiercing);
         }
 
         public IEnumerator ExecuteTurnPipeline(
@@ -95,6 +121,7 @@ namespace CodeForge.Combat
             // Step 1: Resolve Target (Line 31)
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.TargetSocketUI, true);
                 editorUI.HighlightLine(31, true);
             }
             EnemyEntity target = targetingToken != null
@@ -111,12 +138,14 @@ namespace CodeForge.Combat
             yield return new WaitForSeconds(0.2f);
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.TargetSocketUI, false);
                 editorUI.HighlightLine(31, false);
             }
 
             // Step 2: Evaluate Condition (Line 33)
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.ConditionSocketUI, true);
                 editorUI.HighlightLine(33, true);
             }
             CombatContext contextWithTarget = context.WithTarget(target);
@@ -149,16 +178,19 @@ namespace CodeForge.Combat
             yield return new WaitForSeconds(0.2f);
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.ConditionSocketUI, false);
                 editorUI.HighlightLine(33, false);
             }
 
             // Step 3: Execute Selected Action (Line 35 or Line 39)
             ActionTokenSO chosenAction = evalResult ? thenActionToken : elseActionToken;
+            var chosenSocket = evalResult ? editorUI?.ThenActionSocketUI : editorUI?.ElseActionSocketUI;
             int actionLine = evalResult ? 35 : 39;
             string actionSyntax = chosenAction != null ? chosenAction.GetFormattedCodeString() : "Attack(target)";
 
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(chosenSocket, true);
                 editorUI.HighlightLine(actionLine, true);
             }
 
@@ -171,11 +203,21 @@ namespace CodeForge.Combat
                 if (actionSyntax.Contains("Attack")) methodLine = 14;
                 else if (actionSyntax.Contains("Defend")) methodLine = 20;
 
-                if (methodLine > 0 && editorUI != null) editorUI.HighlightLine(methodLine, true);
+                if (editorUI != null)
+                {
+                    if (actionSyntax.Contains("Attack")) editorUI.HighlightSocketRow(editorUI.AttackDamageSocketUI, true);
+                    else if (actionSyntax.Contains("Defend")) editorUI.HighlightSocketRow(editorUI.DefendShieldSocketUI, true);
+                    if (methodLine > 0) editorUI.HighlightLine(methodLine, true);
+                }
 
                 yield return chosenAction.ExecuteAction(contextWithTarget);
 
-                if (methodLine > 0 && editorUI != null) editorUI.HighlightLine(methodLine, false);
+                if (editorUI != null)
+                {
+                    if (actionSyntax.Contains("Attack")) editorUI.HighlightSocketRow(editorUI.AttackDamageSocketUI, false);
+                    else if (actionSyntax.Contains("Defend")) editorUI.HighlightSocketRow(editorUI.DefendShieldSocketUI, false);
+                    if (methodLine > 0) editorUI.HighlightLine(methodLine, false);
+                }
             }
             else
             {
@@ -185,6 +227,7 @@ namespace CodeForge.Combat
 
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(chosenSocket, false);
                 editorUI.HighlightLine(actionLine, false);
             }
             yield return new WaitForSeconds(0.2f);
@@ -206,15 +249,17 @@ namespace CodeForge.Combat
             if (editorUI == null) yield break;
 
             var reactionCond = editorUI.GetReactionConditionToken();
-            var reactionAction = editorUI.GetReactionActionToken();
+            var reactionThenAction = editorUI.GetReactionActionToken();
+            var reactionElseAction = editorUI.GetReactionElseActionToken();
 
-            if (reactionCond == null && reactionAction == null) yield break;
+            if (reactionCond == null && reactionThenAction == null && reactionElseAction == null) yield break;
 
             var context = new CombatContext(this, activeEnemies, null, 0).WithIncomingDamage(incomingDamage);
 
             // Step 1: Reaction Condition (Line 45)
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.ReactionConditionSocketUI, true);
                 editorUI.HighlightLine(45, true);
             }
             bool evalResult = reactionCond != null ? reactionCond.Evaluate(context) : true;
@@ -228,57 +273,73 @@ namespace CodeForge.Combat
             yield return new WaitForSeconds(0.2f);
             if (editorUI != null)
             {
+                editorUI.HighlightSocketRow(editorUI.ReactionConditionSocketUI, false);
                 editorUI.HighlightLine(45, false);
             }
 
+            ActionTokenSO chosenAction = evalResult ? reactionThenAction : reactionElseAction;
+            var reactionSocket = evalResult ? editorUI?.ReactionActionSocketUI : editorUI?.ReactionElseActionSocketUI;
+            int actionLine = evalResult ? 47 : 51;
+            string branchName = evalResult ? "THEN" : "ELSE";
+
             if (evalResult)
             {
-                string actionStr = reactionAction != null ? reactionAction.GetFormattedCodeString() : "Defend()";
-                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}) triggered! Condition '{condSyntax}' is TRUE -> Executed {actionStr}.");
+                if (editorUI.ReactionActionSocketUI != null) editorUI.ReactionActionSocketUI.SetHighlight(new Color(0.2f, 0.9f, 0.3f, 1f), true, 1.0f);
+                if (editorUI.ReactionElseActionSocketUI != null) editorUI.ReactionElseActionSocketUI.SetHighlight(Color.gray, false, 0.3f);
+            }
+            else
+            {
+                if (editorUI.ReactionElseActionSocketUI != null) editorUI.ReactionElseActionSocketUI.SetHighlight(new Color(0.95f, 0.25f, 0.25f, 1f), true, 1.0f);
+                if (editorUI.ReactionActionSocketUI != null) editorUI.ReactionActionSocketUI.SetHighlight(Color.gray, false, 0.3f);
+            }
 
-                // Step 2: Reaction Action (Line 47)
+            if (chosenAction != null)
+            {
+                string actionStr = chosenAction.GetFormattedCodeString();
+                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): '{condSyntax}' is {evalResult.ToString().ToUpper()} -> Executing {branchName} branch '{actionStr}'.");
+
                 if (editorUI != null)
                 {
-                    editorUI.HighlightLine(47, true);
-                }
-
-                if (editorUI.ReactionActionSocketUI != null)
-                {
-                    editorUI.ReactionActionSocketUI.SetHighlight(new Color(0.2f, 0.9f, 0.3f, 1f), true, 1.0f);
+                    editorUI.HighlightSocketRow(reactionSocket, true);
+                    editorUI.HighlightLine(actionLine, true);
                 }
                 yield return new WaitForSeconds(0.2f);
 
-                if (reactionAction != null)
+                int methodLine = 0;
+                if (actionStr.Contains("Defend")) methodLine = 20;
+                else if (actionStr.Contains("Attack")) methodLine = 14;
+
+                if (editorUI != null)
                 {
-                    if (actionStr.Contains("Defend") && editorUI != null) editorUI.HighlightLine(20, true);
-                    yield return reactionAction.ExecuteAction(context);
-                    if (actionStr.Contains("Defend") && editorUI != null) editorUI.HighlightLine(20, false);
+                    if (actionStr.Contains("Attack")) editorUI.HighlightSocketRow(editorUI.AttackDamageSocketUI, true);
+                    else if (actionStr.Contains("Defend")) editorUI.HighlightSocketRow(editorUI.DefendShieldSocketUI, true);
+                    if (methodLine > 0) editorUI.HighlightLine(methodLine, true);
                 }
-                else
+                yield return chosenAction.ExecuteAction(context);
+                if (editorUI != null)
                 {
-                    ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): Condition '{condSyntax}' is TRUE, but no reaction action is slotted.");
-                    yield return new WaitForSeconds(0.1f);
+                    if (actionStr.Contains("Attack")) editorUI.HighlightSocketRow(editorUI.AttackDamageSocketUI, false);
+                    else if (actionStr.Contains("Defend")) editorUI.HighlightSocketRow(editorUI.DefendShieldSocketUI, false);
+                    if (methodLine > 0) editorUI.HighlightLine(methodLine, false);
                 }
 
                 if (editorUI != null)
                 {
-                    editorUI.HighlightLine(47, false);
+                    editorUI.HighlightSocketRow(reactionSocket, false);
+                    editorUI.HighlightLine(actionLine, false);
                 }
             }
             else
             {
-                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): Condition '{condSyntax}' is FALSE -> Reaction skipped.");
-                if (editorUI.ReactionActionSocketUI != null)
-                {
-                    editorUI.ReactionActionSocketUI.SetHighlight(Color.gray, false, 0.3f);
-                }
-                yield return new WaitForSeconds(0.25f);
+                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): '{condSyntax}' is {evalResult.ToString().ToUpper()} -> No action slotted in {branchName} branch; skipped.");
+                yield return new WaitForSeconds(0.15f);
             }
 
             if (editorUI != null)
             {
                 if (editorUI.ReactionConditionSocketUI != null) editorUI.ReactionConditionSocketUI.SetHighlight(Color.white, false, 1.0f);
                 if (editorUI.ReactionActionSocketUI != null) editorUI.ReactionActionSocketUI.SetHighlight(Color.white, false, 1.0f);
+                if (editorUI.ReactionElseActionSocketUI != null) editorUI.ReactionElseActionSocketUI.SetHighlight(Color.white, false, 1.0f);
             }
         }
 

@@ -13,6 +13,13 @@ namespace CodeForge.UI
         DefendShield,
         ReactionCondition,
         ReactionAction,
+        ReactionElseAction,
+        CritChance,
+        CritDamage,
+        EvasionChance,
+        ApplyBleed,
+        BleedDamage,
+        BleedDuration,
         [System.Obsolete] Stance
     }
 }

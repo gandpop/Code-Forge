@@ -57,6 +57,18 @@ namespace CodeForge.Combat
         private Vector3 originalLocalPos;
         private bool isLunging = false;
 
+        [Header("Status Effects")]
+        public int currentBleedDamage = 0;
+        public int currentBleedDuration = 0;
+
+        public void ApplyBleed(int damagePerTurn, int duration)
+        {
+            if (IsDead) return;
+            currentBleedDamage = Mathf.Max(currentBleedDamage, damagePerTurn);
+            currentBleedDuration = Mathf.Max(currentBleedDuration, duration);
+            ConsoleLogUI.Log($"<color=#E06C75>[Status] {gameObject.name} inflicted with Bleed ({currentBleedDamage} DMG/turn for {currentBleedDuration} turns)!</color>");
+        }
+
         public EnemyIntent CurrentIntent { get; private set; }
         public event Action<EnemyIntent> OnIntentChanged;
 
@@ -84,9 +96,18 @@ namespace CodeForge.Combat
         {
             playerTarget = target;
             originalLocalPos = transform.localPosition;
+            currentBleedDamage = 0;
+            currentBleedDuration = 0;
             gameObject.SetActive(true);
             EnsureIntentPlateUI();
             RollNextIntent(1);
+        }
+
+        public override void AdvanceRoomReset()
+        {
+            currentBleedDamage = 0;
+            currentBleedDuration = 0;
+            base.AdvanceRoomReset();
         }
 
         private void EnsureIntentPlateUI()
@@ -193,6 +214,16 @@ namespace CodeForge.Combat
         public IEnumerator ExecuteEnemyTurn(CombatEntity target)
         {
             if (IsDead || target == null || target.IsDead) yield break;
+
+            // Tick Bleed at start of enemy turn
+            if (currentBleedDuration > 0)
+            {
+                TakeDamage(currentBleedDamage);
+                currentBleedDuration--;
+                ConsoleLogUI.Log($"<color=#E06C75>[Status] {gameObject.name} suffers {currentBleedDamage} Bleed damage! ({currentBleedDuration} turns remain)</color>");
+                yield return new WaitForSeconds(0.25f);
+                if (IsDead) yield break;
+            }
 
             switch (CurrentIntent.intentType)
             {

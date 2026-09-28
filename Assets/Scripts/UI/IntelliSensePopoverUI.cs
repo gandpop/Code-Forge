@@ -38,6 +38,7 @@ namespace CodeForge.UI
         [SerializeField] private List<CodeTokenSO> availableTokens = new List<CodeTokenSO>();
 
         private CodeSocketUI activeSocket;
+        private GameObject backdropObj;
 
         private void Awake()
         {
@@ -49,10 +50,48 @@ namespace CodeForge.UI
                 closeButton.onClick.AddListener(Hide);
             }
 
+            EnsureBackdrop();
+
             if (rootContainer != null)
             {
                 rootContainer.SetActive(false);
             }
+        }
+
+        private void EnsureBackdrop()
+        {
+            if (backdropObj != null) return;
+
+            // Must be parented to the ROOT CANVAS, not the local popover rect!
+            Canvas rootCanvas = GetComponentInParent<Canvas>();
+            if (rootCanvas != null)
+            {
+                rootCanvas = rootCanvas.rootCanvas;
+            }
+            Transform parent = rootCanvas != null ? rootCanvas.transform : transform.parent;
+
+            backdropObj = new GameObject("IntelliSenseBackdrop", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+            backdropObj.transform.SetParent(parent, false);
+
+            // Position directly behind popover in hierarchy
+            int popoverIndex = transform.GetSiblingIndex();
+            backdropObj.transform.SetSiblingIndex(Mathf.Max(0, popoverIndex));
+
+            var rect = backdropObj.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.sizeDelta = Vector2.zero;
+            rect.anchoredPosition = Vector2.zero;
+
+            var img = backdropObj.GetComponent<Image>();
+            img.color = new Color(0f, 0f, 0f, 0.001f); // Invisible raycast shield
+            img.raycastTarget = true;
+
+            var btn = backdropObj.GetComponent<Button>();
+            btn.transition = Selectable.Transition.None;
+            btn.onClick.AddListener(Hide);
+
+            backdropObj.SetActive(false);
         }
 
         private void Update()
@@ -94,6 +133,14 @@ namespace CodeForge.UI
         {
             if (socket == null) return;
             activeSocket = socket;
+
+            EnsureBackdrop();
+            if (backdropObj != null)
+            {
+                int popoverIndex = transform.GetSiblingIndex();
+                backdropObj.transform.SetSiblingIndex(Mathf.Max(0, popoverIndex));
+                backdropObj.SetActive(true);
+            }
 
             if (rootContainer != null)
             {
@@ -140,6 +187,10 @@ namespace CodeForge.UI
 
         public void Hide()
         {
+            if (backdropObj != null)
+            {
+                backdropObj.SetActive(false);
+            }
             if (rootContainer != null)
             {
                 rootContainer.SetActive(false);
@@ -168,7 +219,7 @@ namespace CodeForge.UI
                 for (int i = 0; i < invTokens.Count; i++)
                 {
                     var t = invTokens[i];
-                    if (t != null && t.tokenType == expectedType && !candidateTokens.Contains(t))
+                    if (t != null && CodeSocketUI.IsTypeCompatible(t.tokenType, expectedType) && !candidateTokens.Contains(t))
                     {
                         candidateTokens.Add(t);
                     }
