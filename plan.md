@@ -1,17 +1,25 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v9.0)
-## Project: CodeForge — UI Row Instantiation & Full Screen Backdrop Fix
+# ARCHITECTURAL PLAN & SPECIFICATION (v10.0)
+## Project: CodeForge — Mathematical Probability Scaling & Polish
 
 ---
 
-## 1. Executive Summary & Core Fixes
-* **The "Missing Rows" Fix:** The C# logic for `critChance`, `critDamage`, `evasionChance`, `applyBleed`, and `reactionElse` is already implemented in `PlayerCombatController.cs` and `ActionTokenSO.cs`. However, their **UI GameObjects do not exist in the scene hierarchy**. The Architect must dynamically instantiate or assemble these UI row GameObjects into the `Content` container of `CodeEditorPanelUI` on `Awake()`.
-* **The "Popover Backdrop" Fix:** The click-outside backdrop in `IntelliSensePopoverUI.cs` was incorrectly parented to the local popover box (460x327 px). It must be parented to the **Root Canvas** so it spans the full screen (`anchorMin = (0,0), anchorMax = (1,1)`) and reliably catches all outside clicks.
+## 1. Executive Summary & Design Solutions
+* **The Float Chance Exploit Solution:** Float tokens (`1.25f`, `1.50f`, `2.0f`) are scaled into realistic probabilities using visible C# arithmetic in the editor script:
+  - `public float critChance    = [ float ] * 0.10f;` (e.g. `1.25f * 0.10f` = 12.5% crit)
+  - `public float evasionChance = [ float ] * 0.10f; // (Max: 50%)`
+* **Transparent 50% Evasion Cap:** 
+  - To communicate the 50% maximum dodge cap clearly to the player:
+    1. The code row displays an inline comment: `// (Max: 50%)`.
+    2. IntelliSense popover documentation states: `"Scales float token by 0.10f into dodge probability (e.g. 1.50f -> 15.0%). Capped at 50.0%."`
+    3. Console log reports the exact calculation and clamp:
+       `[Start] Evasion calculated as 15.0% (Max Cap: 50%).`
+       If exceeded (e.g. 6.0f token): `[Warning] Evasion calculated as 60.0% -> Clamped to 50.0% maximum cap!`
+* **Planning Phase Health Bar Sync:** `PlayerHealthPlateUI` must update immediately upon room start / planning phase to reflect `20 / 20 HP` instead of defaulting to `100 / 100 HP`.
+* **Scroll Content Bottom Padding:** Add 45px bottom padding to the `Content` container of `EditorScroll` so `OnTakeDamage`'s `else` row does not collide with the bottom edge.
 
 ---
 
-## 2. Full Script Architecture Required on Screen (`PlayerCombat.cs`)
-
-When the player scrolls through the editor, all of the following lines must be physically visible and socketable:
+## 2. Updated Script Architecture (`PlayerCombat.cs`)
 
 ```csharp
 using UnityEngine;
@@ -23,22 +31,22 @@ public class PlayerCombat : MonoBehaviour
     // SECTION 1: STATS & ATTRIBUTES
     // ========================================================
     [Header("Stats")]
-    public int   maxHealth        = [ 20 ];          // Pre-slotted starter
+    public int   maxHealth        = [ 20 ];
     public float damageMultiplier = [ EMPTY -> 1.0f ];
-    public float critChance       = [ EMPTY -> 0.0f ]; // e.g. [ float ]
-    public int   critDamage       = [ EMPTY -> 0    ]; // e.g. [ int ]
-    public float evasionChance    = [ EMPTY -> 0.0f ]; // e.g. [ float ]
-    public int   baseShield       = [ EMPTY -> 0    ]; // e.g. [ int ]
+    public float critChance       = [ EMPTY -> 0.0f ] * 0.10f;
+    public int   critDamage       = [ EMPTY -> 0    ];
+    public float evasionChance    = [ EMPTY -> 0.0f ] * 0.10f; // (Max: 50%)
+    public int   baseShield       = [ EMPTY -> 0    ];
 
     // ========================================================
     // SECTION 2: MODULAR COMBAT METHODS
     // ========================================================
     public void Attack(Enemy target)
     {
-        int damage = [ INT_SOCKET ]; // e.g. [ int ]
+        int damage = [ INT_SOCKET ];
         target.TakeDamage(damage);
 
-        if ( [ BOOL_SOCKET: applyBleed ] ) // e.g. [ bool ]
+        if ( [ BOOL_SOCKET: applyBleed ] )
         {
             target.ApplyBleed([ INT: dmgPerTurn ], [ INT: duration ]);
         }
@@ -46,7 +54,7 @@ public class PlayerCombat : MonoBehaviour
 
     public void Defend()
     {
-        int shield = [ INT_SOCKET ]; // e.g. [ int ]
+        int shield = [ INT_SOCKET ];
         player.AddShield(shield);
     }
 
@@ -64,15 +72,15 @@ public class PlayerCombat : MonoBehaviour
     // ========================================================
     public void ExecuteTurn()
     {
-        var target = [ TARGET_SOCKET ]; // Defaults to Enemies.Random()
+        var target = [ TARGET_SOCKET ];
 
-        if ( [ CONDITION_SOCKET ] )    // Defaults to 'true'
+        if ( [ CONDITION_SOCKET ] )
         {
-            [ ACTION_THEN_SOCKET ];    // e.g. [ Attack(target) ]
+            [ ACTION_THEN_SOCKET ];
         }
         else
         {
-            [ ACTION_ELSE_SOCKET ];    // e.g. [ Defend() ]
+            [ ACTION_ELSE_SOCKET ];
         }
     }
 
@@ -81,13 +89,13 @@ public class PlayerCombat : MonoBehaviour
     // ========================================================
     public void OnTakeDamage(int incomingDamage)
     {
-        if ( [ REACTION_COND_SOCKET ] ) // e.g. [ incomingDamage >= 8 ]
+        if ( [ REACTION_COND_SOCKET ] )
         {
-            [ REACTION_ACTION_THEN ];   // e.g. [ Defend() ]
+            [ REACTION_ACTION_THEN ];
         }
         else
         {
-            [ REACTION_ACTION_ELSE ];   // e.g. [ Attack(target) ]
+            [ REACTION_ACTION_ELSE ];
         }
     }
 }
@@ -95,68 +103,57 @@ public class PlayerCombat : MonoBehaviour
 
 ---
 
-## 3. UI Row Assembly / Dynamic Generation (`CodeForge.UI`)
+## 3. Mathematical Probability & Clamp Logic (`CodeForge.Combat`)
 
-To ensure the missing lines appear without requiring manual Unity Editor GUI drag-and-drop:
-* In `CodeEditorPanelUI.cs`:
-  - When `EnsureAllSockets()` runs, if any socket (`critChanceSocket`, `critDamageSocket`, `evasionChanceSocket`, `applyBleedSocket`, `bleedDamageSocket`, `bleedDurationSocket`, `reactionElseActionSocket`) is `null`:
-    - Clone an existing line row (e.g. clone the `damageMultiplier` row for floats, or `baseShield` row for ints).
-    - Insert it at the correct sibling index in the `Content` container.
-    - Set its text label:
-      - `"public float critChance        ="`
-      - `"public int   critDamage        ="`
-      - `"public float evasionChance     ="`
-      - `"if ( [bool] ) target.ApplyBleed( [int], [int] );"`
-      - `"else { [action] }"` inside `OnTakeDamage`
-    - Configure the cloned `CodeSocketUI`:
-      - Set `socketRole` and `expectedType`.
-      - Wire back-reference to `CodeEditorPanelUI`.
+In `PlayerCombatController.cs` and `CodeEditorPanelUI.cs`:
 
----
-
-## 4. Full-Screen Backdrop Fix (`IntelliSensePopoverUI.cs`)
-
-Fix `EnsureBackdrop()` in `IntelliSensePopoverUI.cs`:
+### 3.1 Crit Chance Calculation
 ```csharp
-private void EnsureBackdrop()
+public float GetCritChance()
 {
-    if (backdropObj != null) return;
+    if (critChanceSocket == null || critChanceSocket.AssignedToken == null) return 0.0f;
+    float rawTokenVal = critChanceSocket.AssignedToken.floatValue;
+    return rawTokenVal * 0.10f; // e.g. 1.25f * 0.10f = 0.125f (12.5%)
+}
+```
 
-    // Must be parented to the ROOT CANVAS, not the local popover rect!
-    Canvas rootCanvas = GetComponentInParent<Canvas>();
-    Transform parent = rootCanvas != null ? rootCanvas.transform : transform.parent;
+### 3.2 Evasion Chance Calculation with 50% Hard Cap
+```csharp
+public float GetEvasionChance()
+{
+    if (evasionChanceSocket == null || evasionChanceSocket.AssignedToken == null) return 0.0f;
+    float rawTokenVal = evasionChanceSocket.AssignedToken.floatValue;
+    float calculatedEvasion = rawTokenVal * 0.10f; // e.g. 1.50f * 0.10f = 0.15f (15%)
 
-    backdropObj = new GameObject("IntelliSenseBackdrop", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
-    backdropObj.transform.SetParent(parent, false);
+    if (calculatedEvasion > 0.50f)
+    {
+        ConsoleLogUI.Log($"<color=#E5C07B>[Warning] Evasion {calculatedEvasion * 100:0.0}% exceeds maximum limit. Clamped to 50.0%!</color>");
+        return 0.50f;
+    }
 
-    // Position directly behind popoverRect in hierarchy
-    int popoverIndex = transform.GetSiblingIndex();
-    backdropObj.transform.SetSiblingIndex(Mathf.Max(0, popoverIndex));
-
-    var rect = backdropObj.GetComponent<RectTransform>();
-    rect.anchorMin = Vector2.zero;
-    rect.anchorMax = Vector2.one;
-    rect.sizeDelta = Vector2.zero;
-    rect.anchoredPosition = Vector2.zero;
-
-    var img = backdropObj.GetComponent<Image>();
-    img.color = new Color(0f, 0f, 0f, 0.001f); // Invisible raycast shield
-    img.raycastTarget = true;
-
-    var btn = backdropObj.GetComponent<Button>();
-    btn.transition = Selectable.Transition.None;
-    btn.onClick.AddListener(Hide);
+    return calculatedEvasion;
 }
 ```
 
 ---
 
+## 4. UI Polish Details (`CodeForge.UI`)
+
+1. **Syntax Text Update on Sockets:**
+   - Update the line text for `critChance`: `"public float critChance       ="` followed by socket, followed by `" * 0.10f;"`.
+   - Update the line text for `evasionChance`: `"public float evasionChance    ="` followed by socket, followed by `" * 0.10f; // (Max: 50%)"`.
+2. **Health Plate Initialization:**
+   - In `PlayerHealthPlateUI.cs` or `CombatManager.EnterPlanningPhase()`:
+     - Immediately invoke `UpdateHealthDisplay(player.CurrentHp, player.MaxHp)` so the HUD displays `20 / 20 HP` from the very first frame of planning.
+3. **EditorScroll Padding:**
+   - On the `Content` GameObject of `EditorScroll`, ensure the `VerticalLayoutGroup` has `padding.bottom = 45`.
+
+---
+
 ## 5. Verification Checklist for Architect Agent
-- [ ] Enter Play Mode:
-  - Scroll down the script: Verify `critChance`, `critDamage`, `evasionChance`, `applyBleed`, and `reactionElse` are physically visible in the code editor.
-  - Verify line numbers are continuous (`01`, `02` ... `40+`).
-- [ ] Click any socket to open IntelliSense:
-  - Click anywhere on the background (e.g. on the arena or empty space).
-  - Verify the popover immediately closes.
-- [ ] Click "Compile & Battle":
-  - Verify battle resolves cleanly with `Int 8` in `Attack` and `Attack(target)` in `ExecuteTurn`.
+- [ ] Inspect Editor: Verify `critChance` displays `* 0.10f;` and `evasionChance` displays `* 0.10f; // (Max: 50%)`.
+- [ ] Slot `1.25f` into `evasionChance`:
+  - Run battle.
+  - Verify console logs: `Evasion calculated as 12.5% (Max Cap: 50%)`.
+- [ ] Verify HUD health displays `20 / 20 HP` on game load before clicking Compile.
+- [ ] Scroll to the bottom of the script: Verify `OnTakeDamage` has 45px of breathing room from the bottom edge.

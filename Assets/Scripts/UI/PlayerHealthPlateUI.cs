@@ -20,6 +20,11 @@ namespace CodeForge.UI
 
             if (player != null)
             {
+                var editor = FindFirstObjectByType<CodeEditorPanelUI>();
+                if (editor != null && editor.GetMaxHealth() > 0)
+                {
+                    player.SetMaxHealth(editor.GetMaxHealth());
+                }
                 player.OnHealthChanged += HandleHealthChanged;
                 player.OnShieldChanged += HandleShieldChanged;
                 RefreshDisplay();

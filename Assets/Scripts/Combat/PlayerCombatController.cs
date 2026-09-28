@@ -23,6 +23,7 @@ namespace CodeForge.Combat
 
         protected override void Awake()
         {
+            maxHp = 20f;
             base.Awake();
             initialPosition = transform.position;
         }
@@ -84,8 +85,17 @@ namespace CodeForge.Combat
             editorUI.HighlightSocketRow(editorUI.BaseShieldSocketUI, false);
             editorUI.HighlightLine(26, false);
 
-            string critStr = CritChance > 0f ? $", Crit={CritChance * 100:0}% (+{CritDamage})" : "";
-            string evaStr = EvasionChance > 0f ? $", Evasion={EvasionChance * 100:0}%" : "";
+            if (EvasionChance > 0f)
+            {
+                ConsoleLogUI.Log($"[Start] Evasion calculated as {EvasionChance * 100:0.0}% (Max Cap: 50%).");
+            }
+            if (CritChance > 0f)
+            {
+                ConsoleLogUI.Log($"[Start] Critical Strike Chance calculated as {CritChance * 100:0.0}% (+{CritDamage} DMG).");
+            }
+
+            string critStr = CritChance > 0f ? $", Crit={CritChance * 100:0.0}% (+{CritDamage})" : "";
+            string evaStr = EvasionChance > 0f ? $", Evasion={EvasionChance * 100:0.0}%" : "";
             ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x{critStr}{evaStr}");
             yield return new WaitForSeconds(0.2f);
         }
@@ -96,7 +106,7 @@ namespace CodeForge.Combat
 
             if (EvasionChance > 0f && UnityEngine.Random.value < EvasionChance)
             {
-                ConsoleLogUI.Log($"<color=#98C379>[Combat] Player DODGED the incoming attack! (Evasion: {EvasionChance * 100:0}%)</color>");
+                ConsoleLogUI.Log($"<color=#98C379>[Combat] Player DODGED the incoming attack! (Evasion: {EvasionChance * 100:0.0}%)</color>");
                 return;
             }
 

@@ -321,6 +321,15 @@ namespace CodeForge.UI
             if (documentationText == null || token == null) return;
 
             string desc = !string.IsNullOrEmpty(token.description) ? token.description : $"Code definition: {token.GetFormattedCodeString()}";
+            if (activeSocket != null && activeSocket.SocketRole == CodeSocketRole.EvasionChance && token.tokenType == CodeTokenType.Float)
+            {
+                desc += $"\n<color=#CE9178>Scales float token by 0.10f into dodge probability (e.g. {token.floatValue:0.00}f -> {token.floatValue * 10f:0.0}%). Capped at 50.0%.</color>";
+            }
+            else if (activeSocket != null && activeSocket.SocketRole == CodeSocketRole.CritChance && token.tokenType == CodeTokenType.Float)
+            {
+                desc += $"\n<color=#CE9178>Scales float token by 0.10f into critical strike probability (e.g. {token.floatValue:0.00}f -> {token.floatValue * 10f:0.0}%).</color>";
+            }
+
             documentationText.text = $"<b><color=#4EC9B0>{token.tokenName}</color></b>\n<color=#D4D4D4>{desc}</color>\n<size=80%><color=#858585>Type: {token.tokenType} | Rarity: {token.rarity}</color></size>";
         }
 

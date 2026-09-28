@@ -6,6 +6,7 @@ using CodeForge.Data;
 
 namespace CodeForge.UI
 {
+    [ExecuteAlways]
     public class CodeSocketUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IPointerExitHandler, IPointerClickHandler
     {
         public CodeSocketRole socketRole;
@@ -31,24 +32,7 @@ namespace CodeForge.UI
             if (socketOutline == null) socketOutline = GetComponent<Outline>();
             if (socketCanvasGroup == null) socketCanvasGroup = GetComponent<CanvasGroup>();
 
-            var layout = GetComponent<LayoutElement>();
-            if (layout != null)
-            {
-                layout.minHeight = 20f;
-                layout.preferredHeight = 20f;
-                layout.preferredWidth = expectedType switch
-                {
-                    CodeTokenType.Int => 60f,
-                    CodeTokenType.Float => 80f,
-                    CodeTokenType.Bool => 70f,
-                    CodeTokenType.Stance => 160f,
-                    CodeTokenType.Targeting => 180f,
-                    CodeTokenType.Condition => 220f,
-                    CodeTokenType.Action => 190f,
-                    _ => 150f
-                };
-                layout.minWidth = layout.preferredWidth;
-            }
+            UpdateSocketWidth();
 
             if (socketValueText != null)
             {
@@ -226,6 +210,8 @@ namespace CodeForge.UI
             {
                 UpdateIdleOutline();
             }
+
+            UpdateSocketWidth();
         }
 
         private void UpdateIdleOutline()
@@ -325,25 +311,6 @@ namespace CodeForge.UI
             if (socketValueText == null) socketValueText = GetComponentInChildren<TextMeshProUGUI>();
             if (socketButton == null) socketButton = GetComponent<Button>();
 
-            var layout = GetComponent<LayoutElement>();
-            if (layout != null)
-            {
-                layout.minHeight = 20f;
-                layout.preferredHeight = 20f;
-                layout.preferredWidth = expectedType switch
-                {
-                    CodeTokenType.Int => 60f,
-                    CodeTokenType.Float => 80f,
-                    CodeTokenType.Bool => 70f,
-                    CodeTokenType.Stance => 160f,
-                    CodeTokenType.Targeting => 180f,
-                    CodeTokenType.Condition => 220f,
-                    CodeTokenType.Action => 190f,
-                    _ => 150f
-                };
-                layout.minWidth = layout.preferredWidth;
-            }
-
             if (socketValueText != null)
             {
                 socketValueText.textWrappingMode = TextWrappingModes.NoWrap;
@@ -357,7 +324,59 @@ namespace CodeForge.UI
             }
 
             RefreshDisplay();
+            UpdateSocketWidth();
             SetHighlight(Color.white, false, 1.0f);
+        }
+
+        public void UpdateSocketWidth()
+        {
+            if (socketValueText == null) socketValueText = GetComponentInChildren<TextMeshProUGUI>();
+            if (socketValueText == null) return;
+
+            socketValueText.textWrappingMode = TextWrappingModes.NoWrap;
+            socketValueText.overflowMode = TextOverflowModes.Ellipsis;
+            socketValueText.alignment = TextAlignmentOptions.Center;
+            socketValueText.margin = Vector4.zero;
+            socketValueText.ForceMeshUpdate();
+
+            float textWidth = socketValueText.preferredWidth;
+            float minWidth = expectedType switch
+            {
+                CodeTokenType.Int => 55f,
+                CodeTokenType.Float => 72f,
+                CodeTokenType.Bool => 68f,
+                CodeTokenType.Stance => 85f,
+                CodeTokenType.Targeting => 95f,
+                CodeTokenType.Action => 110f,
+                CodeTokenType.Condition => 115f,
+                _ => 55f
+            };
+
+            float targetWidth = Mathf.Max(minWidth, textWidth + 24f);
+
+            var layout = GetComponent<LayoutElement>();
+            if (layout != null)
+            {
+                layout.minWidth = targetWidth;
+                layout.preferredWidth = targetWidth;
+                layout.minHeight = 20f;
+                layout.preferredHeight = 20f;
+            }
+
+            var rt = GetComponent<RectTransform>();
+            if (rt != null)
+            {
+                rt.sizeDelta = new Vector2(targetWidth, 20f);
+            }
+
+            if (transform.parent != null)
+            {
+                var parentRt = transform.parent as RectTransform;
+                if (parentRt != null)
+                {
+                    LayoutRebuilder.MarkLayoutForRebuild(parentRt);
+                }
+            }
         }
     }
 }

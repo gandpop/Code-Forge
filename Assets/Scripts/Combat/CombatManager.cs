@@ -65,6 +65,7 @@ namespace CodeForge.Combat
 
                 if (player != null)
                 {
+                    player.SetMaxHealth(codeEditorUI.GetMaxHealth());
                     player.DamageMultiplier = codeEditorUI.GetDamageMultiplier();
                 }
             }

@@ -19,6 +19,8 @@ namespace CodeForge.UI
 
         public static void Log(string message)
         {
+            Debug.Log(message);
+            if (instance == null) instance = Object.FindFirstObjectByType<ConsoleLogUI>();
             if (instance == null) return;
             instance.AppendMessage(message);
         }

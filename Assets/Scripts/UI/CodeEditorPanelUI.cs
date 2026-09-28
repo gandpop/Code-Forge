@@ -7,6 +7,7 @@ using CodeForge.Data;
 
 namespace CodeForge.UI
 {
+    [ExecuteAlways]
     public class CodeEditorPanelUI : MonoBehaviour
     {
         [Header("Class Fields Sockets")]
@@ -142,9 +143,12 @@ namespace CodeForge.UI
             RegisterSocket(reactionConditionSocket);
             RegisterSocket(reactionActionSocket);
             RegisterSocket(reactionElseActionSocket);
+
+            FormatAllEditorRows();
+            EnsureScrollPadding();
         }
 
-        private void EnsureAllSockets()
+        public void EnsureAllSockets()
         {
             // Discover any sockets already existing in children
             var sockets = GetComponentsInChildren<CodeSocketUI>(true);
@@ -186,12 +190,20 @@ namespace CodeForge.UI
                 Transform contentParent = dmgMultRow.transform.parent;
                 int currentInsertIdx = dmgMultRow.transform.GetSiblingIndex() + 1;
 
-                if (critChanceSocket == null)
+                if (critChanceSocket != null)
+                {
+                    var row = critChanceSocket.GetComponentInParent<EditorLineRowUI>();
+                    if (row != null)
+                    {
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color>");
+                    }
+                }
+                else
                 {
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
                     rowObj.name = "Line_critChance";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critChance</color>       <color=#D4D4D4>=</color> ", ";");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color>");
 
                     critChanceSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
                     if (critChanceSocket != null)
@@ -208,7 +220,7 @@ namespace CodeForge.UI
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
                     rowObj.name = "Line_critDamage";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color>   <color=#9CDCFE>critDamage</color>       <color=#D4D4D4>=</color> ", ";");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color> <color=#9CDCFE>critDamage</color> <color=#D4D4D4>=</color> ", ";");
 
                     critDamageSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
                     if (critDamageSocket != null)
@@ -220,12 +232,20 @@ namespace CodeForge.UI
                     anyRowsCreated = true;
                 }
 
-                if (evasionChanceSocket == null)
+                if (evasionChanceSocket != null)
+                {
+                    var row = evasionChanceSocket.GetComponentInParent<EditorLineRowUI>();
+                    if (row != null)
+                    {
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>evasionChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color> <color=#6A9955>// (Max: 50%)</color>");
+                    }
+                }
+                else
                 {
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
                     rowObj.name = "Line_evasionChance";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>evasionChance</color>    <color=#D4D4D4>=</color> ", ";");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>evasionChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color> <color=#6A9955>// (Max: 50%)</color>");
 
                     evasionChanceSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
                     if (evasionChanceSocket != null)
@@ -234,7 +254,6 @@ namespace CodeForge.UI
                         evasionChanceSocket.InitializeRuntime(CodeSocketRole.EvasionChance, CodeTokenType.Float, this);
                         evasionChanceSocket.AssignToken(null);
                     }
-                    anyRowsCreated = true;
                 }
             }
 
@@ -322,6 +341,7 @@ namespace CodeForge.UI
             if (anyRowsCreated)
             {
                 RenumberAllRows();
+                FormatAllEditorRows();
             }
         }
 
@@ -366,7 +386,7 @@ namespace CodeForge.UI
             }
         }
 
-        private void RenumberAllRows()
+        public void RenumberAllRows()
         {
             var anyRow = GetComponentInChildren<EditorLineRowUI>(true);
             Transform content = anyRow != null ? anyRow.transform.parent : null;
@@ -423,22 +443,40 @@ namespace CodeForge.UI
         {
             PrePopulateDefaultTokens();
 
-            if (starterTokens != null)
+            if (Application.isPlaying)
             {
-                foreach (var token in starterTokens)
+                if (starterTokens != null)
                 {
-                    if (token != null)
+                    foreach (var token in starterTokens)
                     {
-                        AddTokenToInventory(token);
+                        if (token != null)
+                        {
+                            AddTokenToInventory(token);
+                        }
                     }
+                }
+
+                // Register tokens with IntelliSense
+                if (IntelliSensePopoverUI.Instance != null)
+                {
+                    if (starterTokens != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(starterTokens);
+                    if (defaultMaxHealth != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(new CodeTokenSO[] { defaultMaxHealth });
                 }
             }
 
-            // Register tokens with IntelliSense
-            if (IntelliSensePopoverUI.Instance != null)
+            FormatAllEditorRows();
+            EnsureScrollPadding();
+        }
+
+        public void FormatAllEditorRows()
+        {
+            var rows = GetComponentsInChildren<EditorLineRowUI>(true);
+            foreach (var row in rows)
             {
-                if (starterTokens != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(starterTokens);
-                if (defaultMaxHealth != null) IntelliSensePopoverUI.Instance.RegisterAvailableTokens(new CodeTokenSO[] { defaultMaxHealth });
+                if (row != null)
+                {
+                    row.FormatRow();
+                }
             }
         }
 
@@ -685,11 +723,9 @@ namespace CodeForge.UI
 
         public float GetCritChance()
         {
-            if (critChanceSocket != null && critChanceSocket.AssignedToken != null)
-            {
-                return Mathf.Max(0f, critChanceSocket.AssignedToken.floatValue);
-            }
-            return 0.0f;
+            if (critChanceSocket == null || critChanceSocket.AssignedToken == null) return 0.0f;
+            float rawTokenVal = critChanceSocket.AssignedToken.floatValue;
+            return rawTokenVal * 0.10f; // e.g. 1.25f * 0.10f = 0.125f (12.5%)
         }
 
         public int GetCritDamage()
@@ -703,11 +739,17 @@ namespace CodeForge.UI
 
         public float GetEvasionChance()
         {
-            if (evasionChanceSocket != null && evasionChanceSocket.AssignedToken != null)
+            if (evasionChanceSocket == null || evasionChanceSocket.AssignedToken == null) return 0.0f;
+            float rawTokenVal = evasionChanceSocket.AssignedToken.floatValue;
+            float calculatedEvasion = rawTokenVal * 0.10f; // e.g. 1.50f * 0.10f = 0.15f (15%)
+
+            if (calculatedEvasion > 0.50f)
             {
-                return Mathf.Clamp01(evasionChanceSocket.AssignedToken.floatValue);
+                ConsoleLogUI.Log($"<color=#E5C07B>[Warning] Evasion {calculatedEvasion * 100:0.0}% exceeds maximum limit. Clamped to 50.0%!</color>");
+                return 0.50f;
             }
-            return 0.0f;
+
+            return calculatedEvasion;
         }
 
         public bool GetApplyBleed()
@@ -836,5 +878,60 @@ namespace CodeForge.UI
         {
             return reactionElseActionSocket != null ? reactionElseActionSocket.AssignedToken as ActionTokenSO : null;
         }
+
+        public void EnsureScrollPadding()
+        {
+            var scrolls = GetComponentsInChildren<ScrollRect>(true);
+            foreach (var s in scrolls)
+            {
+                if (s != null && s.name.Contains("Editor") && s.content != null)
+                {
+                    var vlg = s.content.GetComponent<VerticalLayoutGroup>();
+                    if (vlg != null)
+                    {
+                        var pad = vlg.padding;
+                        pad.bottom = 45;
+                        vlg.padding = pad;
+                    }
+                }
+            }
+        }
+
+#if UNITY_EDITOR
+        [ContextMenu("Bake All Rows To Scene")]
+        public void BakeAllRowsToScene()
+        {
+            EnsureAllSockets();
+            PrePopulateDefaultTokens();
+
+            var allSockets = GetComponentsInChildren<CodeSocketUI>(true);
+            foreach (var s in allSockets)
+            {
+                if (s != null)
+                {
+                    s.SetEditorReference(this);
+                    s.RefreshDisplay();
+                    s.UpdateSocketWidth();
+                    UnityEditor.EditorUtility.SetDirty(s);
+                    var txt = s.GetComponentInChildren<TextMeshProUGUI>();
+                    if (txt != null)
+                    {
+                        UnityEditor.EditorUtility.SetDirty(txt);
+                    }
+                }
+            }
+
+            RenumberAllRows();
+            FormatAllEditorRows();
+            EnsureScrollPadding();
+
+            UnityEditor.EditorUtility.SetDirty(this);
+            UnityEditor.EditorUtility.SetDirty(gameObject);
+            UnityEditor.SceneManagement.EditorSceneManager.MarkSceneDirty(gameObject.scene);
+            UnityEditor.SceneManagement.EditorSceneManager.SaveScene(gameObject.scene);
+            UnityEditor.AssetDatabase.SaveAssets();
+            Debug.Log("[CodeEditorPanelUI] Successfully baked all rows and sockets into the scene!");
+        }
+#endif
     }
 }
