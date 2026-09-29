@@ -14,9 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Integer
   tokenType: 4
-  rarity: 0
-  spawnChance: 0
+  codeDisplaySyntax: 
+  description: 
   floatValue: 0
   intValue: 2
   boolValue: 0
-  targetPriorityValue: 0
+  rarity: 0
+  canSpawnAsReward: 0
+  overrideSpawnChance: 0
+  customSpawnChance: 100

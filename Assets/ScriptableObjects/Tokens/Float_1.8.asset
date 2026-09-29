@@ -14,11 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Float
   tokenType: 3
-  rarity: 1
-  canSpawnAsReward: 1
-  overrideSpawnChance: 0
-  customSpawnChance: 100
+  codeDisplaySyntax: 1.8f
+  description: A floating-point scalar token (1.8f). Used for multipliers or fractional
+    damage reduction.
+  tokenDescription: A floating-point scalar token (1.8f). Used for multipliers or
+    fractional damage reduction.
   floatValue: 1.8
   intValue: 0
   boolValue: 0
-  targetPriorityValue: 0
+  rarity: 3
+  canSpawnAsReward: 1
+  overrideSpawnChance: 0
+  customSpawnChance: 100

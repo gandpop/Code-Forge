@@ -20,6 +20,14 @@ namespace CodeForge.UI
         ApplyBleed,
         BleedDamage,
         BleedDuration,
-        [System.Obsolete] Stance
+        [System.Obsolete] Stance,
+        CritChancePercent,
+        CritMultiplier,
+        EvasionChancePercent,
+        DamageReduction,
+        ConditionOp,
+        Condition2,
+        ReactionConditionOp,
+        ReactionCondition2
     }
 }

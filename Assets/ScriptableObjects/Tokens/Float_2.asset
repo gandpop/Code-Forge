@@ -14,11 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Float
   tokenType: 3
-  rarity: 2
-  canSpawnAsReward: 1
-  overrideSpawnChance: 0
-  customSpawnChance: 100
+  codeDisplaySyntax: 
+  description: 
   floatValue: 2
   intValue: 0
   boolValue: 0
-  targetPriorityValue: 0
+  rarity: 2
+  canSpawnAsReward: 0
+  overrideSpawnChance: 0
+  customSpawnChance: 100

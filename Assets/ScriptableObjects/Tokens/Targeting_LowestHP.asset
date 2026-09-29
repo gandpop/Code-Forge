@@ -15,8 +15,11 @@ MonoBehaviour:
   tokenName: Lowest HP
   tokenType: 0
   codeDisplaySyntax: Enemies.LowestHP()
+  description: 'Target selection query: Enemies.LowestHP().'
+  tokenDescription: 'Target selection query: Enemies.LowestHP().'
   floatValue: 1
   intValue: 0
+  boolValue: 0
   rarity: 0
   canSpawnAsReward: 1
   overrideSpawnChance: 0

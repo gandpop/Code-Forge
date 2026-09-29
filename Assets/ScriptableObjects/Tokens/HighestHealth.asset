@@ -14,9 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: HighestHealth
   tokenType: 0
-  rarity: 2
-  spawnChance: 50
+  codeDisplaySyntax: 
+  description: 
   floatValue: 0
   intValue: 0
   boolValue: 0
-  targetPriorityValue: 1
+  rarity: 2
+  canSpawnAsReward: 0
+  overrideSpawnChance: 0
+  customSpawnChance: 100

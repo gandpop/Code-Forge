@@ -44,18 +44,18 @@ namespace CodeForge.Data
                 case ActionCategory.Attack:
                     yield return context.Player.PerformAttackAnimation();
 
-                    bool isCrit = context.Player != null && context.Player.CritChance > 0f && (Random.value < context.Player.CritChance);
-                    int critBonus = isCrit ? context.Player.CritDamage : 0;
-                    float baseWithCrit = actionValue + critBonus;
-                    float mult = context.Player != null ? context.Player.DamageMultiplier : 1.0f;
-                    float finalDamage = baseWithCrit * mult;
+                    bool isCrit = context.Player != null && context.Player.CritChancePercent > 0 && (Random.Range(0, 100) < context.Player.CritChancePercent);
+                    float critMult = isCrit ? context.Player.CritMultiplier : 1.0f;
+                    float dmgMult = context.Player != null ? context.Player.DamageMultiplier : 1.0f;
+                    float baseScaled = actionValue * dmgMult;
+                    float finalDamage = baseScaled * critMult;
 
-                    string critSuffix = isCrit ? $" (+{critBonus} CRIT BONUS)" : "";
-                    string multText = mult != 1.0f ? $" (Base {actionValue}{critSuffix} * {mult}x = {finalDamage} DMG)" : (isCrit ? $" for {finalDamage} DMG{critSuffix}" : $" for {finalDamage} DMG");
+                    string critSuffix = isCrit ? $" ({critMult:0.0#}x CRIT!)" : "";
+                    string multText = dmgMult != 1.0f ? $" (Base {actionValue}{critSuffix} * {dmgMult:0.0#}x = {finalDamage:0.#} DMG)" : (isCrit ? $" for {finalDamage:0.#} DMG{critSuffix}" : $" for {finalDamage:0.#} DMG");
 
                     if (isCrit)
                     {
-                        ConsoleLogUI.Log($"<color=#E5C07B>[Combat] CRITICAL STRIKE! Dealt {Mathf.RoundToInt(finalDamage)} DMG (+{critBonus} crit bonus)!</color>");
+                        ConsoleLogUI.Log($"<color=#E5C07B>[Combat] CRITICAL STRIKE! ({actionValue} * {dmgMult:0.0#}x) * {critMult:0.0#}x = {Mathf.RoundToInt(finalDamage)} DMG!</color>");
                     }
 
                     if (isAreaOfEffect)

@@ -12,11 +12,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 09d591d0ac51e54428253619756b96c9, type: 3}
   m_Name: Float_1.25
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
-  tokenName: Damage Multiplier
+  tokenName: Float
   tokenType: 3
   codeDisplaySyntax: 1.25f
+  description: A floating-point scalar token (1.25f). Used for multipliers or fractional
+    damage reduction.
+  tokenDescription: A floating-point scalar token (1.25f). Used for multipliers or
+    fractional damage reduction.
   floatValue: 1.25
   intValue: 0
+  boolValue: 0
   rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0

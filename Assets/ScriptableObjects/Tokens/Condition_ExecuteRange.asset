@@ -15,9 +15,12 @@ MonoBehaviour:
   tokenName: Execute Range
   tokenType: 1
   codeDisplaySyntax: target.HealthPercent <= 0.30f
+  description: 'A conditional predicate: target.HealthPercent <= 0.30f.'
+  tokenDescription: 'A conditional predicate: target.HealthPercent <= 0.30f.'
   floatValue: 1
   intValue: 0
-  rarity: 1
+  boolValue: 0
+  rarity: 2
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100

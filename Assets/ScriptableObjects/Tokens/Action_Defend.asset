@@ -14,9 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.ActionTokenSO
   tokenName: Defend
   tokenType: 2
-  codeDisplaySyntax: Defend()
+  codeDisplaySyntax: Defend();
+  description: Calls Defend() method to raise shield.
+  tokenDescription: Calls Defend() method to raise shield.
   floatValue: 1
   intValue: 0
+  boolValue: 0
   rarity: 0
   canSpawnAsReward: 1
   overrideSpawnChance: 0
@@ -25,4 +28,3 @@ MonoBehaviour:
   baseValue: 5
   isAreaOfEffect: 0
   isPiercing: 0
-  description: Calls Defend() method to raise shield.

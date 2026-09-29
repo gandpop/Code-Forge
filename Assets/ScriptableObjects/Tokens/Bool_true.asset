@@ -14,11 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Boolean True
   tokenType: 6
-  rarity: 3
-  canSpawnAsReward: 1
-  overrideSpawnChance: 0
-  customSpawnChance: 100
+  codeDisplaySyntax: true
+  description: A boolean literal (true). Controls condition branching or flag toggles.
+  tokenDescription: A boolean literal (true). Controls condition branching or flag
+    toggles.
   floatValue: 0
   intValue: 0
   boolValue: 1
-  targetPriorityValue: 0
+  rarity: 0
+  canSpawnAsReward: 1
+  overrideSpawnChance: 0
+  customSpawnChance: 100

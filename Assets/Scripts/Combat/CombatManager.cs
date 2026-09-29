@@ -24,6 +24,7 @@ namespace CodeForge.Combat
         [Header("UI Controllers")]
         [SerializeField] private CodeEditorPanelUI codeEditorUI;
         [SerializeField] private RewardPanelUI rewardPanelUI;
+        [SerializeField] private DefeatModalUI defeatModalUI;
 
         private List<EnemyEntity> activeEnemies = new List<EnemyEntity>();
         private int currentRoomIndex = 1;
@@ -37,6 +38,11 @@ namespace CodeForge.Combat
             else Destroy(gameObject);
 
             Application.runInBackground = true;
+
+            if (rewardPanelUI == null)
+            {
+                rewardPanelUI = FindFirstObjectByType<CodeForge.UI.RewardPanelUI>(FindObjectsInactive.Include);
+            }
         }
 
         private void Start()
@@ -50,6 +56,11 @@ namespace CodeForge.Combat
             {
                 StopCoroutine(combatCoroutine);
                 combatCoroutine = null;
+            }
+
+            if (rewardPanelUI != null)
+            {
+                rewardPanelUI.Hide();
             }
 
             SetPhase(GamePhase.Planning);
@@ -197,7 +208,15 @@ namespace CodeForge.Combat
         {
             SetPhase(GamePhase.Defeat);
             if (codeEditorUI != null) codeEditorUI.ResetAllHighlights();
-            ConsoleLogUI.Log("[Error] Runtime Exception: Player terminated by enemy forces. Run Over.");
+            ConsoleLogUI.Log("<color=#FF5454>[Error] Runtime Exception: Player terminated by enemy forces. Run Over.</color>");
+            if (defeatModalUI != null)
+            {
+                defeatModalUI.Show();
+            }
+            else if (DefeatModalUI.Instance != null)
+            {
+                DefeatModalUI.Instance.Show();
+            }
         }
 
         public void AdvanceToNextRoom()
@@ -207,6 +226,16 @@ namespace CodeForge.Combat
             {
                 player.AdvanceRoomReset();
             }
+            EnterPlanningPhase();
+        }
+
+        public void RetryCurrentRoom()
+        {
+            if (player != null)
+            {
+                player.ResetToMaxHp();
+            }
+            ConsoleLogUI.Log($"[System] Retrying Room {currentRoomIndex}... Health restored to max.");
             EnterPlanningPhase();
         }
 
@@ -241,6 +270,17 @@ namespace CodeForge.Combat
             activeEnemies.Clear();
 
             if (enemyPrefab == null) return;
+
+            var platforms = GameObject.Find("ArenaPlatforms");
+            if (platforms != null)
+            {
+                var single = platforms.transform.Find("Pedestal_Enemy_Single");
+                var left = platforms.transform.Find("Pedestal_Enemy_Left");
+                var right = platforms.transform.Find("Pedestal_Enemy_Right");
+                if (single != null) single.gameObject.SetActive(room <= 3);
+                if (left != null) left.gameObject.SetActive(room > 3);
+                if (right != null) right.gameObject.SetActive(room > 3);
+            }
 
             switch (room)
             {

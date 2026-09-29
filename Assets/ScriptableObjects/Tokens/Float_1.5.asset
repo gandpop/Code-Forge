@@ -15,9 +15,14 @@ MonoBehaviour:
   tokenName: Float
   tokenType: 3
   codeDisplaySyntax: 1.5f
+  description: A floating-point scalar token (1.5f). Used for multipliers or fractional
+    damage reduction.
+  tokenDescription: A floating-point scalar token (1.5f). Used for multipliers or
+    fractional damage reduction.
   floatValue: 1.5
   intValue: 0
-  rarity: 1
+  boolValue: 0
+  rarity: 2
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100

@@ -71,6 +71,26 @@ namespace CodeForge.Data
                             candidate = enemy;
                         }
                         break;
+
+                    case TargetPriority.ChargingEnemy:
+                        bool enemyCharging = enemy.CurrentIntent.intentType == EnemyIntentType.Charge;
+                        bool candidateCharging = candidate.CurrentIntent.intentType == EnemyIntentType.Charge;
+                        if (enemyCharging && !candidateCharging)
+                        {
+                            candidate = enemy;
+                        }
+                        else if (enemyCharging && candidateCharging)
+                        {
+                            if (enemy.CurrentHp < candidate.CurrentHp)
+                            {
+                                candidate = enemy;
+                            }
+                        }
+                        else if (!candidateCharging && enemy.CurrentHp < candidate.CurrentHp)
+                        {
+                            candidate = enemy;
+                        }
+                        break;
                 }
             }
 

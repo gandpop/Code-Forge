@@ -12,9 +12,14 @@ namespace CodeForge.Combat
         public int MaxHealth { get; set; } = 20;
         public float DamageMultiplier { get; set; } = 1.0f;
         public int BaseShield { get; set; } = 0;
-        public float CritChance { get; set; } = 0.0f;
-        public int CritDamage { get; set; } = 0;
-        public float EvasionChance { get; set; } = 0.0f;
+        public int CritChancePercent { get; set; } = 0;
+        public float CritMultiplier { get; set; } = 1.5f;
+        public int EvasionChancePercent { get; set; } = 0;
+        public int DamageReduction { get; set; } = 0;
+
+        [System.Obsolete] public float CritChance => CritChancePercent / 100f;
+        [System.Obsolete] public int CritDamage => Mathf.RoundToInt(CritMultiplier);
+        [System.Obsolete] public float EvasionChance => EvasionChancePercent / 100f;
         [System.Obsolete] public PlayerStance CurrentStance { get; private set; } = PlayerStance.Balanced;
         [System.Obsolete] public StanceTokenSO SlottedStanceToken { get; private set; }
         public float EffectiveDamageMultiplier => Mathf.Max(0.1f, DamageMultiplier);
@@ -37,8 +42,7 @@ namespace CodeForge.Combat
 
         public void AddStartingShield(int amount)
         {
-            if (amount <= 0) return;
-            AddShield(amount);
+            SetShield(amount);
             ConsoleLogUI.Log($"[Start] Executed player.AddStartingShield({amount}) -> Current Shield: {CurrentShield}.");
         }
 
@@ -64,9 +68,10 @@ namespace CodeForge.Combat
             int maxHealth = editorUI.GetMaxHealth();
             int startingShield = editorUI.GetBaseShield();
             float dmgMult = editorUI.GetDamageMultiplier();
-            CritChance = editorUI.GetCritChance();
-            CritDamage = editorUI.GetCritDamage();
-            EvasionChance = editorUI.GetEvasionChance();
+            CritChancePercent = editorUI.GetCritChancePercent();
+            CritMultiplier = editorUI.GetCritMultiplier();
+            EvasionChancePercent = editorUI.GetEvasionChancePercent();
+            DamageReduction = editorUI.GetDamageReduction();
             DamageMultiplier = dmgMult;
 
             // Highlight line: player.SetMaxHealth(maxHealth);
@@ -80,23 +85,28 @@ namespace CodeForge.Combat
             // Highlight line: player.AddStartingShield(baseShield);
             editorUI.HighlightSocketRow(editorUI.BaseShieldSocketUI, true);
             editorUI.HighlightLine(26, true);
-            AddStartingShield(startingShield);
+            SetShield(startingShield);
             yield return new WaitForSeconds(0.2f);
             editorUI.HighlightSocketRow(editorUI.BaseShieldSocketUI, false);
             editorUI.HighlightLine(26, false);
 
-            if (EvasionChance > 0f)
+            if (EvasionChancePercent > 0)
             {
-                ConsoleLogUI.Log($"[Start] Evasion calculated as {EvasionChance * 100:0.0}% (Max Cap: 50%).");
+                ConsoleLogUI.Log($"[Start] Evasion calculated as {EvasionChancePercent}% (Max Cap: 50%).");
             }
-            if (CritChance > 0f)
+            if (CritChancePercent > 0)
             {
-                ConsoleLogUI.Log($"[Start] Critical Strike Chance calculated as {CritChance * 100:0.0}% (+{CritDamage} DMG).");
+                ConsoleLogUI.Log($"[Start] Critical Strike Chance calculated as {CritChancePercent}% ({CritMultiplier:0.0#}x Multiplier).");
+            }
+            if (DamageReduction > 0)
+            {
+                ConsoleLogUI.Log($"[Start] Flat Armor (Damage Reduction) calculated as {DamageReduction} DMG.");
             }
 
-            string critStr = CritChance > 0f ? $", Crit={CritChance * 100:0.0}% (+{CritDamage})" : "";
-            string evaStr = EvasionChance > 0f ? $", Evasion={EvasionChance * 100:0.0}%" : "";
-            ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x{critStr}{evaStr}");
+            string critStr = CritChancePercent > 0 ? $", Crit={CritChancePercent}% ({CritMultiplier:0.0#}x)" : "";
+            string evaStr = EvasionChancePercent > 0 ? $", Evasion={EvasionChancePercent}%" : "";
+            string redStr = DamageReduction > 0 ? $", Armor={DamageReduction}" : "";
+            ConsoleLogUI.Log($"[Start] Initialized Player: MaxHP={maxHealth}, StartingShield={startingShield}, DamageMult={dmgMult:0.0}x{critStr}{evaStr}{redStr}");
             yield return new WaitForSeconds(0.2f);
         }
 
@@ -104,13 +114,24 @@ namespace CodeForge.Combat
         {
             if (IsDead) return;
 
-            if (EvasionChance > 0f && UnityEngine.Random.value < EvasionChance)
+            // Check Evasion
+            if (EvasionChancePercent > 0 && UnityEngine.Random.Range(0, 100) < EvasionChancePercent)
             {
-                ConsoleLogUI.Log($"<color=#98C379>[Combat] Player DODGED the incoming attack! (Evasion: {EvasionChance * 100:0.0}%)</color>");
+                ConsoleLogUI.Log($"<color=#98C379>[Combat] Player EVADED the attack! ({EvasionChancePercent}% Evasion)</color>");
                 return;
             }
 
-            base.TakeDamage(amount, isPiercing);
+            // Apply Damage Reduction (Flat Armor)
+            float incoming = amount;
+            float finalAmount = incoming;
+            if (DamageReduction > 0 && !isPiercing)
+            {
+                float reduced = Mathf.Max(1f, incoming - DamageReduction);
+                ConsoleLogUI.Log($"[Combat] Armor mitigated {incoming - reduced:0} DMG ({DamageReduction} flat Armor). Incoming: {reduced:0} DMG.");
+                finalAmount = reduced;
+            }
+
+            base.TakeDamage(finalAmount, isPiercing);
         }
 
         public IEnumerator ExecuteTurnPipeline(
@@ -159,8 +180,8 @@ namespace CodeForge.Combat
                 editorUI.HighlightLine(33, true);
             }
             CombatContext contextWithTarget = context.WithTarget(target);
-            bool evalResult = conditionToken != null ? conditionToken.Evaluate(contextWithTarget) : true;
-            string condSyntax = conditionToken != null ? conditionToken.GetFormattedCodeString() : "true";
+            bool evalResult = editorUI != null ? editorUI.EvaluateCondition(contextWithTarget) : (conditionToken != null ? conditionToken.Evaluate(contextWithTarget) : true);
+            string condSyntax = editorUI != null ? editorUI.GetConditionSyntax() : (conditionToken != null ? conditionToken.GetFormattedCodeString() : "true");
 
             string targetStatus = target != null
                 ? $" (HP: {Mathf.RoundToInt(target.HealthPercent * 100f)}% - {Mathf.CeilToInt(target.CurrentHp)}/{Mathf.CeilToInt(target.MaxHp)}{(target.IsShielded ? $", Shield: {target.CurrentShield}" : "")})"
@@ -272,8 +293,8 @@ namespace CodeForge.Combat
                 editorUI.HighlightSocketRow(editorUI.ReactionConditionSocketUI, true);
                 editorUI.HighlightLine(45, true);
             }
-            bool evalResult = reactionCond != null ? reactionCond.Evaluate(context) : true;
-            string condSyntax = reactionCond != null ? reactionCond.GetFormattedCodeString() : "true";
+            bool evalResult = editorUI != null ? editorUI.EvaluateReactionCondition(context) : (reactionCond != null ? reactionCond.Evaluate(context) : true);
+            string condSyntax = editorUI != null ? editorUI.GetReactionConditionSyntax() : (reactionCond != null ? reactionCond.GetFormattedCodeString() : "true");
 
             if (editorUI.ReactionConditionSocketUI != null)
             {

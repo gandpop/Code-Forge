@@ -7,7 +7,7 @@ using CodeForge.Data;
 namespace CodeForge.UI
 {
     [RequireComponent(typeof(CanvasGroup))]
-    public class DraggableTokenCardUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler
+    public class DraggableTokenCardUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
         public CodeTokenSO Token { get; private set; }
 
@@ -28,6 +28,17 @@ namespace CodeForge.UI
             rootCanvas = GetComponentInParent<Canvas>();
         }
 
+        public void OnPointerClick(PointerEventData eventData)
+        {
+            if (eventData.dragging) return;
+            if (Token == null) return;
+
+            if (TokenInspectorPopoverUI.Instance != null)
+            {
+                TokenInspectorPopoverUI.Instance.Show(Token, transform.position);
+            }
+        }
+
         public void BindToken(CodeTokenSO token)
         {
             Token = token;
@@ -46,9 +57,14 @@ namespace CodeForge.UI
             {
                 string typeColor = Token.tokenType switch
                 {
-                    CodeTokenType.Targeting => "#4EC9B0", // Teal
-                    CodeTokenType.Condition => "#DCDCAA", // Yellowish / Expression
-                    CodeTokenType.Action => "#C586C0",    // Purple / Action
+                    CodeTokenType.Targeting => "#C586C0", // Matches [ target ]
+                    CodeTokenType.Condition => "#9CDCFE", // Matches [ condition ]
+                    CodeTokenType.Action => "#DCDCAA",    // Matches [ action ]
+                    CodeTokenType.Float => "#B5CEA8",     // Matches [ float ]
+                    CodeTokenType.Int => "#B5CEA8",       // Matches [ int ]
+                    CodeTokenType.Bool => "#569CD6",      // Matches [ bool ]
+                    CodeTokenType.Stance => "#4EC9B0",    // Matches [ stance ]
+                    CodeTokenType.Operator => "#D4D4D4",  // Matches [ op ]
                     _ => "#D4D4D4"
                 };
 
@@ -57,10 +73,16 @@ namespace CodeForge.UI
                     CodeTokenType.Targeting => "target",
                     CodeTokenType.Condition => "condition",
                     CodeTokenType.Action => "action",
+                    CodeTokenType.Float => "float",
+                    CodeTokenType.Int => "int",
+                    CodeTokenType.Bool => "bool",
+                    CodeTokenType.Stance => "stance",
+                    CodeTokenType.Operator => "operator",
                     _ => "var"
                 };
 
-                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=110%><b>{Token.GetFormattedCodeString()}</b></size>";
+                cardText.color = Color.white;
+                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=110%><b><color=#FFFFFF>{Token.GetFormattedCodeString()}</color></b></size>";
             }
 
             if (rarityBorder != null)

@@ -15,9 +15,11 @@ MonoBehaviour:
   tokenName: Integer
   tokenType: 4
   codeDisplaySyntax: 15
+  description: 
   floatValue: 0
   intValue: 15
+  boolValue: 0
   rarity: 3
-  canSpawnAsReward: 1
+  canSpawnAsReward: 0
   overrideSpawnChance: 0
   customSpawnChance: 100

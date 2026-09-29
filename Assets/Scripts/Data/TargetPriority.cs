@@ -6,6 +6,7 @@ namespace CodeForge.Data
         HighestHealth,
         HighestThreat,
         FirstInLine,
-        BossOnly
+        BossOnly,
+        ChargingEnemy
     }
 }

@@ -13,10 +13,15 @@ namespace CodeForge.UI
         [Header("Class Fields Sockets")]
         [SerializeField] private CodeSocketUI maxHealthSocket;
         [SerializeField] private CodeSocketUI damageMultiplierSocket;
-        [SerializeField] private CodeSocketUI critChanceSocket;
-        [SerializeField] private CodeSocketUI critDamageSocket;
-        [SerializeField] private CodeSocketUI evasionChanceSocket;
+        [SerializeField] private CodeSocketUI critChancePercentSocket;
+        [SerializeField] private CodeSocketUI critMultiplierSocket;
+        [SerializeField] private CodeSocketUI evasionChancePercentSocket;
+        [SerializeField] private CodeSocketUI damageReductionSocket;
         [SerializeField] private CodeSocketUI baseShieldSocket;
+
+        [SerializeField, HideInInspector] private CodeSocketUI critChanceSocket;
+        [SerializeField, HideInInspector] private CodeSocketUI critDamageSocket;
+        [SerializeField, HideInInspector] private CodeSocketUI evasionChanceSocket;
 
         [Header("Modular Combat Methods Sockets")]
         [SerializeField] private CodeSocketUI attackDamageSocket;
@@ -31,11 +36,15 @@ namespace CodeForge.UI
         [Header("ExecuteTurn Method Sockets")]
         [SerializeField] private CodeSocketUI targetSocket;
         [SerializeField] private CodeSocketUI conditionSocket;
+        [SerializeField] private CodeSocketUI conditionOpSocket;
+        [SerializeField] private CodeSocketUI condition2Socket;
         [SerializeField] private CodeSocketUI thenActionSocket;
         [SerializeField] private CodeSocketUI elseActionSocket;
 
         [Header("OnTakeDamage Callback Sockets")]
         [SerializeField] private CodeSocketUI reactionConditionSocket;
+        [SerializeField] private CodeSocketUI reactionConditionOpSocket;
+        [SerializeField] private CodeSocketUI reactionCondition2Socket;
         [SerializeField] private CodeSocketUI reactionActionSocket;
         [SerializeField] private CodeSocketUI reactionElseActionSocket;
 
@@ -69,17 +78,22 @@ namespace CodeForge.UI
         [Header("Starter Loadout")]
         [SerializeField] private List<CodeTokenSO> starterTokens = new List<CodeTokenSO>();
 
+        public List<CodeTokenSO> StarterTokens => starterTokens;
+
         private Dictionary<int, EditorLineRowUI> lineRows = new Dictionary<int, EditorLineRowUI>();
 
         public CodeSocketUI TargetSocketUI => targetSocket != null ? targetSocket : targetingSocket;
         public CodeSocketUI ConditionSocketUI => conditionSocket != null ? conditionSocket : piercingSocket;
+        public CodeSocketUI ConditionOpSocketUI => conditionOpSocket;
+        public CodeSocketUI Condition2SocketUI => condition2Socket;
         public CodeSocketUI ThenActionSocketUI => thenActionSocket != null ? thenActionSocket : damageSocket;
         public CodeSocketUI ElseActionSocketUI => elseActionSocket != null ? elseActionSocket : multiplierSocket;
         public CodeSocketUI MaxHealthSocketUI => maxHealthSocket;
         public CodeSocketUI DamageMultiplierSocketUI => damageMultiplierSocket;
-        public CodeSocketUI CritChanceSocketUI => critChanceSocket;
-        public CodeSocketUI CritDamageSocketUI => critDamageSocket;
-        public CodeSocketUI EvasionChanceSocketUI => evasionChanceSocket;
+        public CodeSocketUI CritChancePercentSocketUI => critChancePercentSocket != null ? critChancePercentSocket : critChanceSocket;
+        public CodeSocketUI CritMultiplierSocketUI => critMultiplierSocket != null ? critMultiplierSocket : critDamageSocket;
+        public CodeSocketUI EvasionChancePercentSocketUI => evasionChancePercentSocket != null ? evasionChancePercentSocket : evasionChanceSocket;
+        public CodeSocketUI DamageReductionSocketUI => damageReductionSocket;
         public CodeSocketUI BaseShieldSocketUI => baseShieldSocket;
         public CodeSocketUI AttackDamageSocketUI => attackDamageSocket;
         public CodeSocketUI ApplyBleedSocketUI => applyBleedSocket;
@@ -88,8 +102,15 @@ namespace CodeForge.UI
         public CodeSocketUI DefendShieldSocketUI => defendShieldSocket;
         public CodeSocketUI StanceSocketUI => stanceSocket;
         public CodeSocketUI ReactionConditionSocketUI => reactionConditionSocket;
+        public CodeSocketUI ReactionConditionOpSocketUI => reactionConditionOpSocket;
+        public CodeSocketUI ReactionCondition2SocketUI => reactionCondition2Socket;
         public CodeSocketUI ReactionActionSocketUI => reactionActionSocket;
         public CodeSocketUI ReactionElseActionSocketUI => reactionElseActionSocket;
+
+        // Legacy compatibility properties
+        public CodeSocketUI CritChanceSocketUI => CritChancePercentSocketUI;
+        public CodeSocketUI CritDamageSocketUI => CritMultiplierSocketUI;
+        public CodeSocketUI EvasionChanceSocketUI => EvasionChancePercentSocketUI;
 
         private void Awake()
         {
@@ -98,8 +119,19 @@ namespace CodeForge.UI
             if (thenActionSocket == null) thenActionSocket = damageSocket;
             if (elseActionSocket == null) elseActionSocket = multiplierSocket;
 
+            EnsureStarterTokens();
+
             if (tokenInventoryContainer != null)
             {
+                for (int i = tokenInventoryContainer.childCount - 1; i >= 0; i--)
+                {
+                    var child = tokenInventoryContainer.GetChild(i);
+                    if (Application.isPlaying)
+                        Destroy(child.gameObject);
+                    else
+                        DestroyImmediate(child.gameObject);
+                }
+
                 var scrollRect = tokenInventoryContainer.GetComponentInParent<ScrollRect>();
                 if (scrollRect != null)
                 {
@@ -126,13 +158,16 @@ namespace CodeForge.UI
             // Ensure sockets have back-reference to this editor panel
             RegisterSocket(TargetSocketUI);
             RegisterSocket(ConditionSocketUI);
+            RegisterSocket(conditionOpSocket);
+            RegisterSocket(condition2Socket);
             RegisterSocket(ThenActionSocketUI);
             RegisterSocket(ElseActionSocketUI);
             RegisterSocket(maxHealthSocket);
             RegisterSocket(damageMultiplierSocket);
-            RegisterSocket(critChanceSocket);
-            RegisterSocket(critDamageSocket);
-            RegisterSocket(evasionChanceSocket);
+            RegisterSocket(CritChancePercentSocketUI);
+            RegisterSocket(CritMultiplierSocketUI);
+            RegisterSocket(EvasionChancePercentSocketUI);
+            RegisterSocket(damageReductionSocket);
             RegisterSocket(baseShieldSocket);
             RegisterSocket(attackDamageSocket);
             RegisterSocket(applyBleedSocket);
@@ -141,10 +176,13 @@ namespace CodeForge.UI
             RegisterSocket(defendShieldSocket);
             RegisterSocket(stanceSocket);
             RegisterSocket(reactionConditionSocket);
+            RegisterSocket(reactionConditionOpSocket);
+            RegisterSocket(reactionCondition2Socket);
             RegisterSocket(reactionActionSocket);
             RegisterSocket(reactionElseActionSocket);
 
             FormatAllEditorRows();
+            UpdateChanceRowDisplays();
             EnsureScrollPadding();
         }
 
@@ -158,13 +196,31 @@ namespace CodeForge.UI
                 switch (s.SocketRole)
                 {
                     case CodeSocketRole.CritChance:
-                        if (critChanceSocket == null) critChanceSocket = s;
+                    case CodeSocketRole.CritChancePercent:
+                        if (critChancePercentSocket == null) critChancePercentSocket = s;
                         break;
                     case CodeSocketRole.CritDamage:
-                        if (critDamageSocket == null) critDamageSocket = s;
+                    case CodeSocketRole.CritMultiplier:
+                        if (critMultiplierSocket == null) critMultiplierSocket = s;
                         break;
                     case CodeSocketRole.EvasionChance:
-                        if (evasionChanceSocket == null) evasionChanceSocket = s;
+                    case CodeSocketRole.EvasionChancePercent:
+                        if (evasionChancePercentSocket == null) evasionChancePercentSocket = s;
+                        break;
+                    case CodeSocketRole.DamageReduction:
+                        if (damageReductionSocket == null) damageReductionSocket = s;
+                        break;
+                    case CodeSocketRole.ConditionOp:
+                        if (conditionOpSocket == null) conditionOpSocket = s;
+                        break;
+                    case CodeSocketRole.Condition2:
+                        if (condition2Socket == null) condition2Socket = s;
+                        break;
+                    case CodeSocketRole.ReactionConditionOp:
+                        if (reactionConditionOpSocket == null) reactionConditionOpSocket = s;
+                        break;
+                    case CodeSocketRole.ReactionCondition2:
+                        if (reactionCondition2Socket == null) reactionCondition2Socket = s;
                         break;
                     case CodeSocketRole.ApplyBleed:
                         if (applyBleedSocket == null) applyBleedSocket = s;
@@ -183,76 +239,137 @@ namespace CodeForge.UI
 
             bool anyRowsCreated = false;
 
-            // Step 1: Class fields (critChance, critDamage, evasionChance)
+            // Step 1: Class fields (damageMultiplier, critChancePercent, critMultiplier, evasionChancePercent, damageReduction, baseShield)
             EditorLineRowUI dmgMultRow = damageMultiplierSocket != null ? damageMultiplierSocket.GetComponentInParent<EditorLineRowUI>() : null;
             if (dmgMultRow != null)
             {
+                SetRowTexts(dmgMultRow.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>damageMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.0x)</color>");
+
                 Transform contentParent = dmgMultRow.transform.parent;
                 int currentInsertIdx = dmgMultRow.transform.GetSiblingIndex() + 1;
 
-                if (critChanceSocket != null)
+                if (critChancePercentSocket != null)
                 {
-                    var row = critChanceSocket.GetComponentInParent<EditorLineRowUI>();
+                    critChancePercentSocket.InitializeRuntime(CodeSocketRole.CritChancePercent, CodeTokenType.Int, this);
+                    critChancePercentSocket.gameObject.name = "Socket_critChancePercent";
+                    var row = critChancePercentSocket.GetComponentInParent<EditorLineRowUI>();
                     if (row != null)
                     {
-                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color>");
+                        row.gameObject.name = "Line_critChancePercent";
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>critChancePercent</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// %</color>");
                     }
                 }
                 else
                 {
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
-                    rowObj.name = "Line_critChance";
+                    rowObj.name = "Line_critChancePercent";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color>");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color> <color=#9CDCFE>critChancePercent</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// %</color>");
 
-                    critChanceSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
-                    if (critChanceSocket != null)
+                    critChancePercentSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                    if (critChancePercentSocket != null)
                     {
-                        critChanceSocket.gameObject.name = "Socket_critChance";
-                        critChanceSocket.InitializeRuntime(CodeSocketRole.CritChance, CodeTokenType.Float, this);
-                        critChanceSocket.AssignToken(null);
+                        critChancePercentSocket.gameObject.name = "Socket_critChancePercent";
+                        critChancePercentSocket.InitializeRuntime(CodeSocketRole.CritChancePercent, CodeTokenType.Int, this);
+                        critChancePercentSocket.AssignToken(null);
                     }
                     anyRowsCreated = true;
                 }
 
-                if (critDamageSocket == null)
+                if (critMultiplierSocket != null)
                 {
-                    GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
-                    rowObj.name = "Line_critDamage";
-                    rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color> <color=#9CDCFE>critDamage</color> <color=#D4D4D4>=</color> ", ";");
-
-                    critDamageSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
-                    if (critDamageSocket != null)
-                    {
-                        critDamageSocket.gameObject.name = "Socket_critDamage";
-                        critDamageSocket.InitializeRuntime(CodeSocketRole.CritDamage, CodeTokenType.Int, this);
-                        critDamageSocket.AssignToken(null);
-                    }
-                    anyRowsCreated = true;
-                }
-
-                if (evasionChanceSocket != null)
-                {
-                    var row = evasionChanceSocket.GetComponentInParent<EditorLineRowUI>();
+                    critMultiplierSocket.InitializeRuntime(CodeSocketRole.CritMultiplier, CodeTokenType.Float, this);
+                    critMultiplierSocket.gameObject.name = "Socket_critMultiplier";
+                    var row = critMultiplierSocket.GetComponentInParent<EditorLineRowUI>();
                     if (row != null)
                     {
-                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>evasionChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color> <color=#6A9955>// (Max: 50%)</color>");
+                        row.gameObject.name = "Line_critMultiplier";
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>");
                     }
                 }
                 else
                 {
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
-                    rowObj.name = "Line_evasionChance";
+                    rowObj.name = "Line_critMultiplier";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>evasionChance</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>*</color> <color=#B5CEA8>0.10f</color><color=#D4D4D4>;</color> <color=#6A9955>// (Max: 50%)</color>");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>");
 
-                    evasionChanceSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
-                    if (evasionChanceSocket != null)
+                    critMultiplierSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                    if (critMultiplierSocket != null)
                     {
-                        evasionChanceSocket.gameObject.name = "Socket_evasionChance";
-                        evasionChanceSocket.InitializeRuntime(CodeSocketRole.EvasionChance, CodeTokenType.Float, this);
-                        evasionChanceSocket.AssignToken(null);
+                        critMultiplierSocket.gameObject.name = "Socket_critMultiplier";
+                        critMultiplierSocket.InitializeRuntime(CodeSocketRole.CritMultiplier, CodeTokenType.Float, this);
+                        critMultiplierSocket.AssignToken(null);
+                    }
+                    anyRowsCreated = true;
+                }
+
+                if (evasionChancePercentSocket != null)
+                {
+                    evasionChancePercentSocket.InitializeRuntime(CodeSocketRole.EvasionChancePercent, CodeTokenType.Int, this);
+                    evasionChancePercentSocket.gameObject.name = "Socket_evasionChancePercent";
+                    var row = evasionChancePercentSocket.GetComponentInParent<EditorLineRowUI>();
+                    if (row != null)
+                    {
+                        row.gameObject.name = "Line_evasionChancePercent";
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>evasionChancePercent</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// % (Max: 50%)</color>");
+                    }
+                }
+                else
+                {
+                    GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
+                    rowObj.name = "Line_evasionChancePercent";
+                    rowObj.transform.SetSiblingIndex(currentInsertIdx++);
+                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color> <color=#9CDCFE>evasionChancePercent</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// % (Max: 50%)</color>");
+
+                    evasionChancePercentSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                    if (evasionChancePercentSocket != null)
+                    {
+                        evasionChancePercentSocket.gameObject.name = "Socket_evasionChancePercent";
+                        evasionChancePercentSocket.InitializeRuntime(CodeSocketRole.EvasionChancePercent, CodeTokenType.Int, this);
+                        evasionChancePercentSocket.AssignToken(null);
+                    }
+                    anyRowsCreated = true;
+                }
+
+                if (damageReductionSocket != null)
+                {
+                    damageReductionSocket.InitializeRuntime(CodeSocketRole.DamageReduction, CodeTokenType.Int, this);
+                    damageReductionSocket.gameObject.name = "Socket_damageReduction";
+                    var row = damageReductionSocket.GetComponentInParent<EditorLineRowUI>();
+                    if (row != null)
+                    {
+                        row.gameObject.name = "Line_damageReduction";
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>damageReduction</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// (Flat Armor)</color>");
+                    }
+                }
+                else
+                {
+                    int insertIdx = evasionChancePercentSocket != null
+                        ? evasionChancePercentSocket.GetComponentInParent<EditorLineRowUI>().transform.GetSiblingIndex() + 1
+                        : currentInsertIdx++;
+
+                    GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
+                    rowObj.name = "Line_damageReduction";
+                    rowObj.transform.SetSiblingIndex(insertIdx);
+                    SetRowTexts(rowObj, "    <color=#569CD6>public int</color> <color=#9CDCFE>damageReduction</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// (Flat Armor)</color>");
+
+                    damageReductionSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                    if (damageReductionSocket != null)
+                    {
+                        damageReductionSocket.gameObject.name = "Socket_damageReduction";
+                        damageReductionSocket.InitializeRuntime(CodeSocketRole.DamageReduction, CodeTokenType.Int, this);
+                        damageReductionSocket.AssignToken(null);
+                    }
+                    anyRowsCreated = true;
+                }
+
+                if (baseShieldSocket != null)
+                {
+                    var row = baseShieldSocket.GetComponentInParent<EditorLineRowUI>();
+                    if (row != null)
+                    {
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>baseShield</color> <color=#D4D4D4>=</color> ", "<color=#D4D4D4>;</color>");
                     }
                 }
             }
@@ -305,15 +422,150 @@ namespace CodeForge.UI
                         bleedDurationSocket.AssignToken(null);
 
                         var tPost = postTr.GetComponent<TextMeshProUGUI>();
-                        if (tPost != null) tPost.text = " );";
+                        if (tPost != null) tPost.text = " ); <color=#6A9955>// (damage, duration)</color>";
                         postTr.SetAsLastSibling();
                     }
 
                     anyRowsCreated = true;
                 }
             }
+            else if (applyBleedSocket != null)
+            {
+                var row = applyBleedSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    var postTr = row.transform.Find("PostText");
+                    if (postTr != null)
+                    {
+                        var tPost = postTr.GetComponent<TextMeshProUGUI>();
+                        if (tPost != null) tPost.text = " ); <color=#6A9955>// (damage, duration)</color>";
+                    }
+                }
+            }
 
-            // Step 3: else action block inside OnTakeDamage
+            // Step 3: Compound row inside ExecuteTurn()
+            if (ConditionSocketUI != null)
+            {
+                EditorLineRowUI condRow = ConditionSocketUI.GetComponentInParent<EditorLineRowUI>();
+                if (condRow != null)
+                {
+                    SetRowTexts(condRow.gameObject, "        <color=#C586C0>if</color> ( ", "");
+
+                    if (conditionOpSocket == null)
+                    {
+                        Transform contentParent = condRow.transform.parent;
+                        Transform existingCompound = contentParent.Find("Line_conditionCompound");
+                        if (existingCompound != null)
+                        {
+                            var sList = existingCompound.GetComponentsInChildren<CodeSocketUI>(true);
+                            foreach (var s in sList)
+                            {
+                                if (s.name.Contains("Op") || s.SocketRole == CodeSocketRole.ConditionOp) conditionOpSocket = s;
+                                else condition2Socket = s;
+                            }
+                        }
+
+                        if (conditionOpSocket == null)
+                        {
+                            int insertIdx = condRow.transform.GetSiblingIndex() + 1;
+                            GameObject rowObj = Instantiate(condRow.gameObject, contentParent);
+                            rowObj.name = "Line_conditionCompound";
+                            rowObj.transform.SetSiblingIndex(insertIdx);
+
+                            SetRowTexts(rowObj, "             ", " <color=#D4D4D4>)</color>");
+
+                            conditionOpSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                            if (conditionOpSocket != null)
+                            {
+                                conditionOpSocket.gameObject.name = "Socket_conditionOp";
+                                conditionOpSocket.InitializeRuntime(CodeSocketRole.ConditionOp, CodeTokenType.Operator, this);
+                                conditionOpSocket.AssignToken(null);
+                            }
+
+                            Transform postTr = rowObj.transform.Find("PostText");
+                            if (postTr != null && conditionOpSocket != null)
+                            {
+                                GameObject mid = Instantiate(postTr.gameObject, rowObj.transform);
+                                mid.name = "MidText";
+                                var tMid = mid.GetComponent<TextMeshProUGUI>();
+                                if (tMid != null) tMid.text = " ";
+
+                                GameObject c2Obj = Instantiate(conditionOpSocket.gameObject, rowObj.transform);
+                                c2Obj.name = "Socket_condition2";
+                                condition2Socket = c2Obj.GetComponent<CodeSocketUI>();
+                                condition2Socket.InitializeRuntime(CodeSocketRole.Condition2, CodeTokenType.Condition, this);
+                                condition2Socket.AssignToken(null);
+
+                                postTr.SetAsLastSibling();
+                            }
+                            anyRowsCreated = true;
+                        }
+                    }
+                }
+            }
+
+            // Step 4: Compound row inside OnTakeDamage()
+            if (reactionConditionSocket != null)
+            {
+                EditorLineRowUI rCondRow = reactionConditionSocket.GetComponentInParent<EditorLineRowUI>();
+                if (rCondRow != null)
+                {
+                    SetRowTexts(rCondRow.gameObject, "        <color=#C586C0>if</color> ( ", "");
+
+                    if (reactionConditionOpSocket == null)
+                    {
+                        Transform contentParent = rCondRow.transform.parent;
+                        Transform existingCompound = contentParent.Find("Line_reactionConditionCompound");
+                        if (existingCompound != null)
+                        {
+                            var sList = existingCompound.GetComponentsInChildren<CodeSocketUI>(true);
+                            foreach (var s in sList)
+                            {
+                                if (s.name.Contains("Op") || s.SocketRole == CodeSocketRole.ReactionConditionOp) reactionConditionOpSocket = s;
+                                else reactionCondition2Socket = s;
+                            }
+                        }
+
+                        if (reactionConditionOpSocket == null)
+                        {
+                            int insertIdx = rCondRow.transform.GetSiblingIndex() + 1;
+                            GameObject rowObj = Instantiate(rCondRow.gameObject, contentParent);
+                            rowObj.name = "Line_reactionConditionCompound";
+                            rowObj.transform.SetSiblingIndex(insertIdx);
+
+                            SetRowTexts(rowObj, "             ", " <color=#D4D4D4>)</color>");
+
+                            reactionConditionOpSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
+                            if (reactionConditionOpSocket != null)
+                            {
+                                reactionConditionOpSocket.gameObject.name = "Socket_reactionConditionOp";
+                                reactionConditionOpSocket.InitializeRuntime(CodeSocketRole.ReactionConditionOp, CodeTokenType.Operator, this);
+                                reactionConditionOpSocket.AssignToken(null);
+                            }
+
+                            Transform postTr = rowObj.transform.Find("PostText");
+                            if (postTr != null && reactionConditionOpSocket != null)
+                            {
+                                GameObject mid = Instantiate(postTr.gameObject, rowObj.transform);
+                                mid.name = "MidText";
+                                var tMid = mid.GetComponent<TextMeshProUGUI>();
+                                if (tMid != null) tMid.text = " ";
+
+                                GameObject c2Obj = Instantiate(reactionConditionOpSocket.gameObject, rowObj.transform);
+                                c2Obj.name = "Socket_reactionCondition2";
+                                reactionCondition2Socket = c2Obj.GetComponent<CodeSocketUI>();
+                                reactionCondition2Socket.InitializeRuntime(CodeSocketRole.ReactionCondition2, CodeTokenType.Condition, this);
+                                reactionCondition2Socket.AssignToken(null);
+
+                                postTr.SetAsLastSibling();
+                            }
+                            anyRowsCreated = true;
+                        }
+                    }
+                }
+            }
+
+            // Step 5: else action block inside OnTakeDamage
             if (reactionElseActionSocket == null && reactionActionSocket != null)
             {
                 EditorLineRowUI reactionRow = reactionActionSocket.GetComponentInParent<EditorLineRowUI>();
@@ -439,8 +691,123 @@ namespace CodeForge.UI
             }
         }
 
+        public void EnsureStarterTokens()
+        {
+            if (starterTokens == null) starterTokens = new List<CodeTokenSO>();
+            starterTokens.RemoveAll(t => t == null);
+
+            // Strictly prune non-starter tokens (e.g. Int_25, Int_20, duplicate items)
+            string[] requiredStarters = new string[] { "Int_8", "Action_AttackTarget", "Bool_true" };
+            starterTokens.RemoveAll(t => !System.Array.Exists(requiredStarters, req => req == t.name));
+
+            // Ensure unique set of the required starter tokens
+            var uniqueList = new List<CodeTokenSO>();
+            foreach (var req in requiredStarters)
+            {
+                var existing = starterTokens.Find(t => t.name == req);
+                if (existing != null)
+                {
+                    uniqueList.Add(existing);
+                }
+                else
+                {
+                    var allTokens = Resources.FindObjectsOfTypeAll<CodeTokenSO>();
+                    foreach (var t in allTokens)
+                    {
+                        if (t != null && t.name == req)
+                        {
+                            uniqueList.Add(t);
+                            break;
+                        }
+                    }
+                }
+            }
+            starterTokens = uniqueList;
+        }
+
+        public void UpdateChanceRowDisplays()
+        {
+            if (critChancePercentSocket != null)
+            {
+                var row = critChancePercentSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// %</color>";
+                    if (critChancePercentSocket.AssignedToken != null)
+                    {
+                        postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// % (= {critChancePercentSocket.AssignedToken.intValue}%)</color>";
+                    }
+                    SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>critChancePercent</color> <color=#D4D4D4>=</color> ", postText);
+                    row.FormatRow();
+                }
+            }
+
+            if (critMultiplierSocket != null)
+            {
+                var row = critMultiplierSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>";
+                    if (critMultiplierSocket.AssignedToken != null)
+                    {
+                        postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// x (= {critMultiplierSocket.AssignedToken.floatValue:0.0#}x)</color>";
+                    }
+                    SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", postText);
+                    row.FormatRow();
+                }
+            }
+
+            if (evasionChancePercentSocket != null)
+            {
+                var row = evasionChancePercentSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// % (Max: 50%)</color>";
+                    if (evasionChancePercentSocket.AssignedToken != null)
+                    {
+                        int capped = Mathf.Min(50, evasionChancePercentSocket.AssignedToken.intValue);
+                        postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// (= {capped}%, Max: 50%)</color>";
+                    }
+                    SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>evasionChancePercent</color> <color=#D4D4D4>=</color> ", postText);
+                    row.FormatRow();
+                }
+            }
+
+            if (damageReductionSocket != null)
+            {
+                var row = damageReductionSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// (Flat Armor)</color>";
+                    if (damageReductionSocket.AssignedToken != null)
+                    {
+                        int armor = Mathf.Max(0, damageReductionSocket.AssignedToken.intValue);
+                        postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// (= -{armor} incoming DMG)</color>";
+                    }
+                    SetRowTexts(row.gameObject, "    <color=#569CD6>public int</color> <color=#9CDCFE>damageReduction</color> <color=#D4D4D4>=</color> ", postText);
+                    row.FormatRow();
+                }
+            }
+
+            if (damageMultiplierSocket != null)
+            {
+                var row = damageMultiplierSocket.GetComponentInParent<EditorLineRowUI>();
+                if (row != null)
+                {
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.0x)</color>";
+                    if (damageMultiplierSocket.AssignedToken != null)
+                    {
+                        postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// x (= {damageMultiplierSocket.AssignedToken.floatValue:0.0#}x)</color>";
+                    }
+                    SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>damageMultiplier</color> <color=#D4D4D4>=</color> ", postText);
+                    row.FormatRow();
+                }
+            }
+        }
+
         private void Start()
         {
+            EnsureStarterTokens();
             PrePopulateDefaultTokens();
 
             if (Application.isPlaying)
@@ -465,7 +832,21 @@ namespace CodeForge.UI
             }
 
             FormatAllEditorRows();
+            UpdateChanceRowDisplays();
             EnsureScrollPadding();
+            EnsureInventoryScrollSensitivity();
+        }
+
+        public void EnsureInventoryScrollSensitivity()
+        {
+            if (tokenInventoryContainer != null)
+            {
+                var shelfScroll = tokenInventoryContainer.GetComponentInParent<ScrollRect>();
+                if (shelfScroll != null)
+                {
+                    shelfScroll.scrollSensitivity = 12f;
+                }
+            }
         }
 
         public void FormatAllEditorRows()
@@ -536,10 +917,16 @@ namespace CodeForge.UI
             ClearAllLineHighlights();
             ResetSocketHighlight(TargetSocketUI);
             ResetSocketHighlight(ConditionSocketUI);
+            ResetSocketHighlight(conditionOpSocket);
+            ResetSocketHighlight(condition2Socket);
             ResetSocketHighlight(ThenActionSocketUI);
             ResetSocketHighlight(ElseActionSocketUI);
             ResetSocketHighlight(maxHealthSocket);
             ResetSocketHighlight(damageMultiplierSocket);
+            ResetSocketHighlight(critChancePercentSocket);
+            ResetSocketHighlight(critMultiplierSocket);
+            ResetSocketHighlight(evasionChancePercentSocket);
+            ResetSocketHighlight(damageReductionSocket);
             ResetSocketHighlight(critChanceSocket);
             ResetSocketHighlight(critDamageSocket);
             ResetSocketHighlight(evasionChanceSocket);
@@ -551,6 +938,8 @@ namespace CodeForge.UI
             ResetSocketHighlight(defendShieldSocket);
             ResetSocketHighlight(stanceSocket);
             ResetSocketHighlight(reactionConditionSocket);
+            ResetSocketHighlight(reactionConditionOpSocket);
+            ResetSocketHighlight(reactionCondition2Socket);
             ResetSocketHighlight(reactionActionSocket);
             ResetSocketHighlight(reactionElseActionSocket);
         }
@@ -624,83 +1013,134 @@ namespace CodeForge.UI
             return list;
         }
 
-        public void AutoAssignToken(CodeTokenSO token)
+        public bool AutoAssignToken(CodeTokenSO token)
         {
-            if (token == null) return;
+            if (token == null) return false;
+
+            CodeSocketUI target = null;
 
             switch (token.tokenType)
             {
+                case CodeTokenType.Operator:
+                    if (conditionOpSocket != null && conditionOpSocket.AssignedToken == null)
+                        target = conditionOpSocket;
+                    else if (reactionConditionOpSocket != null && reactionConditionOpSocket.AssignedToken == null)
+                        target = reactionConditionOpSocket;
+                    else if (conditionOpSocket != null)
+                        target = conditionOpSocket;
+                    break;
+
                 case CodeTokenType.Targeting:
-                    if (TargetSocketUI != null)
-                        TargetSocketUI.AssignToken(token);
+                    if (TargetSocketUI != null && TargetSocketUI.AssignedToken == null)
+                        target = TargetSocketUI;
+                    else if (TargetSocketUI != null)
+                        target = TargetSocketUI;
                     break;
 
                 case CodeTokenType.Condition:
                     if (token is ConditionTokenSO condToken && condToken.subject == ConditionSubject.IncomingDamage)
                     {
-                        if (reactionConditionSocket != null)
-                            reactionConditionSocket.AssignToken(token);
+                        if (reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                            target = reactionConditionSocket;
+                        else if (reactionCondition2Socket != null && reactionCondition2Socket.AssignedToken == null)
+                            target = reactionCondition2Socket;
+                        else if (reactionConditionSocket != null)
+                            target = reactionConditionSocket;
                     }
                     else
                     {
-                        if (ConditionSocketUI != null)
-                            ConditionSocketUI.AssignToken(token);
+                        if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
+                            target = ConditionSocketUI;
+                        else if (condition2Socket != null && condition2Socket.AssignedToken == null)
+                            target = condition2Socket;
+                        else if (reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                            target = reactionConditionSocket;
+                        else if (reactionCondition2Socket != null && reactionCondition2Socket.AssignedToken == null)
+                            target = reactionCondition2Socket;
+                        else if (ConditionSocketUI != null)
+                            target = ConditionSocketUI;
                     }
                     break;
 
                 case CodeTokenType.Action:
                     if (ThenActionSocketUI != null && ThenActionSocketUI.AssignedToken == null)
-                        ThenActionSocketUI.AssignToken(token);
+                        target = ThenActionSocketUI;
                     else if (ElseActionSocketUI != null && ElseActionSocketUI.AssignedToken == null)
-                        ElseActionSocketUI.AssignToken(token);
+                        target = ElseActionSocketUI;
                     else if (reactionActionSocket != null && reactionActionSocket.AssignedToken == null)
-                        reactionActionSocket.AssignToken(token);
+                        target = reactionActionSocket;
                     else if (reactionElseActionSocket != null && reactionElseActionSocket.AssignedToken == null)
-                        reactionElseActionSocket.AssignToken(token);
+                        target = reactionElseActionSocket;
                     else if (ThenActionSocketUI != null)
-                        ThenActionSocketUI.AssignToken(token);
+                        target = ThenActionSocketUI;
                     break;
 
                 case CodeTokenType.Float:
                     if (damageMultiplierSocket != null && damageMultiplierSocket.AssignedToken == null)
-                        damageMultiplierSocket.AssignToken(token);
-                    else if (critChanceSocket != null && critChanceSocket.AssignedToken == null)
-                        critChanceSocket.AssignToken(token);
-                    else if (evasionChanceSocket != null && evasionChanceSocket.AssignedToken == null)
-                        evasionChanceSocket.AssignToken(token);
+                        target = damageMultiplierSocket;
+                    else if (critMultiplierSocket != null && critMultiplierSocket.AssignedToken == null)
+                        target = critMultiplierSocket;
                     else if (damageMultiplierSocket != null)
-                        damageMultiplierSocket.AssignToken(token);
+                        target = damageMultiplierSocket;
                     break;
 
                 case CodeTokenType.Int:
                     if (attackDamageSocket != null && attackDamageSocket.AssignedToken == null)
-                        attackDamageSocket.AssignToken(token);
+                        target = attackDamageSocket;
+                    else if (critChancePercentSocket != null && critChancePercentSocket.AssignedToken == null)
+                        target = critChancePercentSocket;
+                    else if (evasionChancePercentSocket != null && evasionChancePercentSocket.AssignedToken == null)
+                        target = evasionChancePercentSocket;
+                    else if (damageReductionSocket != null && damageReductionSocket.AssignedToken == null)
+                        target = damageReductionSocket;
                     else if (defendShieldSocket != null && defendShieldSocket.AssignedToken == null)
-                        defendShieldSocket.AssignToken(token);
-                    else if (critDamageSocket != null && critDamageSocket.AssignedToken == null)
-                        critDamageSocket.AssignToken(token);
+                        target = defendShieldSocket;
                     else if (baseShieldSocket != null && baseShieldSocket.AssignedToken == null)
-                        baseShieldSocket.AssignToken(token);
+                        target = baseShieldSocket;
                     else if (bleedDamageSocket != null && bleedDamageSocket.AssignedToken == null)
-                        bleedDamageSocket.AssignToken(token);
+                        target = bleedDamageSocket;
                     else if (bleedDurationSocket != null && bleedDurationSocket.AssignedToken == null)
-                        bleedDurationSocket.AssignToken(token);
+                        target = bleedDurationSocket;
                     else if (maxHealthSocket != null && maxHealthSocket.AssignedToken == null)
-                        maxHealthSocket.AssignToken(token);
-                    else if (baseShieldSocket != null)
-                        baseShieldSocket.AssignToken(token);
+                        target = maxHealthSocket;
+                    else if (attackDamageSocket != null)
+                        target = attackDamageSocket;
                     break;
 
                 case CodeTokenType.Bool:
-                    if (applyBleedSocket != null)
-                        applyBleedSocket.AssignToken(token);
+                    if (applyBleedSocket != null && applyBleedSocket.AssignedToken == null)
+                        target = applyBleedSocket;
+                    else if (ConditionSocketUI != null && ConditionSocketUI.AssignedToken == null)
+                        target = ConditionSocketUI;
+                    else if (condition2Socket != null && condition2Socket.AssignedToken == null)
+                        target = condition2Socket;
+                    else if (reactionConditionSocket != null && reactionConditionSocket.AssignedToken == null)
+                        target = reactionConditionSocket;
+                    else if (reactionCondition2Socket != null && reactionCondition2Socket.AssignedToken == null)
+                        target = reactionCondition2Socket;
+                    else if (applyBleedSocket != null)
+                        target = applyBleedSocket;
                     break;
 
                 case CodeTokenType.Stance:
                     if (stanceSocket != null)
-                        stanceSocket.AssignToken(token);
+                        target = stanceSocket;
                     break;
             }
+
+            if (target != null)
+            {
+                if (target.AssignedToken != null)
+                {
+                    AddTokenToInventory(target.AssignedToken);
+                }
+                target.AssignToken(token);
+                ConsoleLogUI.Log($"[Auto-Slot] Assigned {token.GetFormattedCodeString()} to {target.SocketRole}.");
+                return true;
+            }
+
+            ConsoleLogUI.Log($"<color=#E5C07B>[Warning] No compatible socket available for {token.tokenName}.</color>");
+            return false;
         }
 
         public int GetMaxHealth()
@@ -721,36 +1161,50 @@ namespace CodeForge.UI
             return 1.0f;
         }
 
-        public float GetCritChance()
+        public int GetCritChancePercent()
         {
-            if (critChanceSocket == null || critChanceSocket.AssignedToken == null) return 0.0f;
-            float rawTokenVal = critChanceSocket.AssignedToken.floatValue;
-            return rawTokenVal * 0.10f; // e.g. 1.25f * 0.10f = 0.125f (12.5%)
-        }
-
-        public int GetCritDamage()
-        {
-            if (critDamageSocket != null && critDamageSocket.AssignedToken != null)
+            if (critChancePercentSocket != null && critChancePercentSocket.AssignedToken != null)
             {
-                return Mathf.Max(0, critDamageSocket.AssignedToken.intValue);
+                return Mathf.Clamp(critChancePercentSocket.AssignedToken.intValue, 0, 100);
             }
             return 0;
         }
 
-        public float GetEvasionChance()
+        public float GetCritMultiplier()
         {
-            if (evasionChanceSocket == null || evasionChanceSocket.AssignedToken == null) return 0.0f;
-            float rawTokenVal = evasionChanceSocket.AssignedToken.floatValue;
-            float calculatedEvasion = rawTokenVal * 0.10f; // e.g. 1.50f * 0.10f = 0.15f (15%)
-
-            if (calculatedEvasion > 0.50f)
+            if (critMultiplierSocket != null && critMultiplierSocket.AssignedToken != null)
             {
-                ConsoleLogUI.Log($"<color=#E5C07B>[Warning] Evasion {calculatedEvasion * 100:0.0}% exceeds maximum limit. Clamped to 50.0%!</color>");
-                return 0.50f;
+                return critMultiplierSocket.AssignedToken.floatValue > 0f ? critMultiplierSocket.AssignedToken.floatValue : 1.5f;
             }
-
-            return calculatedEvasion;
+            return 1.5f;
         }
+
+        public int GetEvasionChancePercent()
+        {
+            if (evasionChancePercentSocket != null && evasionChancePercentSocket.AssignedToken != null)
+            {
+                return Mathf.Clamp(evasionChancePercentSocket.AssignedToken.intValue, 0, 50);
+            }
+            return 0;
+        }
+
+        public int GetDamageReduction()
+        {
+            if (damageReductionSocket != null && damageReductionSocket.AssignedToken != null)
+            {
+                return Mathf.Max(0, damageReductionSocket.AssignedToken.intValue);
+            }
+            return 0;
+        }
+
+        [System.Obsolete("Use GetCritChancePercent()")]
+        public float GetCritChance() => GetCritChancePercent() / 100f;
+
+        [System.Obsolete("Use GetCritMultiplier()")]
+        public int GetCritDamage() => 0;
+
+        [System.Obsolete("Use GetEvasionChancePercent()")]
+        public float GetEvasionChance() => GetEvasionChancePercent() / 100f;
 
         public bool GetApplyBleed()
         {
@@ -765,18 +1219,18 @@ namespace CodeForge.UI
         {
             if (bleedDamageSocket != null && bleedDamageSocket.AssignedToken != null)
             {
-                return Mathf.Max(1, bleedDamageSocket.AssignedToken.intValue);
+                return Mathf.Max(0, bleedDamageSocket.AssignedToken.intValue);
             }
-            return 3;
+            return 0;
         }
 
         public int GetBleedDuration()
         {
             if (bleedDurationSocket != null && bleedDurationSocket.AssignedToken != null)
             {
-                return Mathf.Max(1, bleedDurationSocket.AssignedToken.intValue);
+                return Mathf.Max(0, bleedDurationSocket.AssignedToken.intValue);
             }
-            return 2;
+            return 0;
         }
 
         public int GetBaseShield()
@@ -824,7 +1278,11 @@ namespace CodeForge.UI
             {
                 if (req.socket == null || req.socket.AssignedToken == null)
                 {
-                    ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] CS0165: Use of unassigned variable '{req.name}'. Please assign a token before compiling!</color>");
+                    var row = req.socket != null ? req.socket.GetComponentInParent<EditorLineRowUI>() : null;
+                    int lineNum = row != null ? row.lineNumber : 0;
+                    string lineLocation = lineNum > 0 ? $"PlayerCombat.cs({lineNum}): error " : "";
+                    string onLine = lineNum > 0 ? $" on line {lineNum}" : "";
+                    ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] {lineLocation}CS0165: Use of unassigned variable '{req.name}'{onLine}. Please assign a token before compiling!</color>");
                     if (req.socket != null)
                     {
                         req.socket.TriggerUnassignedPulsingHighlight();
@@ -832,6 +1290,36 @@ namespace CodeForge.UI
                     return false;
                 }
             }
+
+            // If operator is slotted, condition2 MUST be assigned
+            if (conditionOpSocket != null && conditionOpSocket.AssignedToken != null)
+            {
+                if (condition2Socket == null || condition2Socket.AssignedToken == null)
+                {
+                    int lineNum = conditionOpSocket.GetComponentInParent<EditorLineRowUI>()?.lineNumber ?? 38;
+                    ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] PlayerCombat.cs({lineNum}): error CS1525: Invalid expression term. Operator '{conditionOpSocket.AssignedToken.GetFormattedCodeString()}' requires a right-hand condition.</color>");
+                    if (condition2Socket != null)
+                    {
+                        condition2Socket.TriggerUnassignedPulsingHighlight();
+                    }
+                    return false;
+                }
+            }
+
+            if (reactionConditionOpSocket != null && reactionConditionOpSocket.AssignedToken != null)
+            {
+                if (reactionCondition2Socket == null || reactionCondition2Socket.AssignedToken == null)
+                {
+                    int lineNum = reactionConditionOpSocket.GetComponentInParent<EditorLineRowUI>()?.lineNumber ?? 45;
+                    ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] PlayerCombat.cs({lineNum}): error CS1525: Invalid expression term. Operator '{reactionConditionOpSocket.AssignedToken.GetFormattedCodeString()}' requires a right-hand condition.</color>");
+                    if (reactionCondition2Socket != null)
+                    {
+                        reactionCondition2Socket.TriggerUnassignedPulsingHighlight();
+                    }
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -879,6 +1367,82 @@ namespace CodeForge.UI
             return reactionElseActionSocket != null ? reactionElseActionSocket.AssignedToken as ActionTokenSO : null;
         }
 
+        private bool EvaluateSingleSocket(CodeSocketUI socket, CombatContext context)
+        {
+            if (socket == null || socket.AssignedToken == null) return true;
+            if (socket.AssignedToken.tokenType == CodeTokenType.Bool) return socket.AssignedToken.boolValue;
+            if (socket.AssignedToken is ConditionTokenSO cond) return cond.Evaluate(context);
+            return true;
+        }
+
+        public bool EvaluateCondition(CombatContext context)
+        {
+            bool c1 = EvaluateSingleSocket(ConditionSocketUI, context);
+            string c1Str = ConditionSocketUI?.AssignedToken != null ? ConditionSocketUI.AssignedToken.GetFormattedCodeString() : "true";
+
+            // Single condition path
+            if (conditionOpSocket == null || conditionOpSocket.AssignedToken == null)
+            {
+                return c1;
+            }
+
+            var opToken = conditionOpSocket.AssignedToken as OperatorTokenSO;
+            bool c2 = EvaluateSingleSocket(condition2Socket, context);
+            string c2Str = condition2Socket?.AssignedToken != null ? condition2Socket.AssignedToken.GetFormattedCodeString() : "true";
+
+            bool finalResult = opToken != null ? opToken.Evaluate(c1, c2) : c1;
+            string opSymbol = opToken != null ? opToken.GetFormattedCodeString() : "&&";
+            ConsoleLogUI.Log($"[Eval] ({c1Str} [{c1}] {opSymbol} {c2Str} [{c2}]) => Overall: <b>{(finalResult ? "<color=#98C379>TRUE</color>" : "<color=#E06C75>FALSE</color>")}</b>");
+
+            return finalResult;
+        }
+
+        public string GetConditionSyntax()
+        {
+            string c1Str = ConditionSocketUI?.AssignedToken != null ? ConditionSocketUI.AssignedToken.GetFormattedCodeString() : "true";
+            if (conditionOpSocket != null && conditionOpSocket.AssignedToken != null)
+            {
+                string opStr = conditionOpSocket.AssignedToken.GetFormattedCodeString();
+                string c2Str = condition2Socket?.AssignedToken != null ? condition2Socket.AssignedToken.GetFormattedCodeString() : "...";
+                return $"{c1Str} {opStr} {c2Str}";
+            }
+            return c1Str;
+        }
+
+        public bool EvaluateReactionCondition(CombatContext context)
+        {
+            bool c1 = EvaluateSingleSocket(reactionConditionSocket, context);
+            string c1Str = reactionConditionSocket?.AssignedToken != null ? reactionConditionSocket.AssignedToken.GetFormattedCodeString() : "true";
+
+            // Single condition path
+            if (reactionConditionOpSocket == null || reactionConditionOpSocket.AssignedToken == null)
+            {
+                return c1;
+            }
+
+            var opToken = reactionConditionOpSocket.AssignedToken as OperatorTokenSO;
+            bool c2 = EvaluateSingleSocket(reactionCondition2Socket, context);
+            string c2Str = reactionCondition2Socket?.AssignedToken != null ? reactionCondition2Socket.AssignedToken.GetFormattedCodeString() : "true";
+
+            bool finalResult = opToken != null ? opToken.Evaluate(c1, c2) : c1;
+            string opSymbol = opToken != null ? opToken.GetFormattedCodeString() : "&&";
+            ConsoleLogUI.Log($"[Eval] ({c1Str} [{c1}] {opSymbol} {c2Str} [{c2}]) => Overall: <b>{(finalResult ? "<color=#98C379>TRUE</color>" : "<color=#E06C75>FALSE</color>")}</b>");
+
+            return finalResult;
+        }
+
+        public string GetReactionConditionSyntax()
+        {
+            string c1Str = reactionConditionSocket?.AssignedToken != null ? reactionConditionSocket.AssignedToken.GetFormattedCodeString() : "true";
+            if (reactionConditionOpSocket != null && reactionConditionOpSocket.AssignedToken != null)
+            {
+                string opStr = reactionConditionOpSocket.AssignedToken.GetFormattedCodeString();
+                string c2Str = reactionCondition2Socket?.AssignedToken != null ? reactionCondition2Socket.AssignedToken.GetFormattedCodeString() : "...";
+                return $"{c1Str} {opStr} {c2Str}";
+            }
+            return c1Str;
+        }
+
         public void EnsureScrollPadding()
         {
             var scrolls = GetComponentsInChildren<ScrollRect>(true);
@@ -924,6 +1488,7 @@ namespace CodeForge.UI
             RenumberAllRows();
             FormatAllEditorRows();
             EnsureScrollPadding();
+            EnsureInventoryScrollSensitivity();
 
             UnityEditor.EditorUtility.SetDirty(this);
             UnityEditor.EditorUtility.SetDirty(gameObject);

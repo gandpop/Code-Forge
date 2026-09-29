@@ -8,7 +8,8 @@ namespace CodeForge.Data
         Float = 3,      // Numeric float constant / multiplier
         Int = 4,        // Numeric integer constant / stat
         Stance = 5,     // Player combat stance (Start method)
-        Bool = 6        // Boolean value (true / false)
+        Bool = 6,       // Boolean value (true / false)
+        Operator = 7    // Logic operators (&&, ||, !)
     }
 }
 

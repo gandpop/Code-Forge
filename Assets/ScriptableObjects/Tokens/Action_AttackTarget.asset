@@ -14,9 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.ActionTokenSO
   tokenName: Attack Target
   tokenType: 2
-  codeDisplaySyntax: Attack(target)
+  codeDisplaySyntax: Attack(target);
+  description: Calls Attack(target) method with configured damage.
+  tokenDescription: Calls Attack(target) method with configured damage.
   floatValue: 1
   intValue: 0
+  boolValue: 0
   rarity: 0
   canSpawnAsReward: 1
   overrideSpawnChance: 0
@@ -25,4 +28,3 @@ MonoBehaviour:
   baseValue: 8
   isAreaOfEffect: 0
   isPiercing: 0
-  description: Calls Attack(target) method with configured damage.

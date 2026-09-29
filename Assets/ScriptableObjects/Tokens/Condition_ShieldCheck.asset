@@ -15,9 +15,12 @@ MonoBehaviour:
   tokenName: Shield Check
   tokenType: 1
   codeDisplaySyntax: target.IsShielded == true
+  description: 'A conditional predicate: target.IsShielded == true.'
+  tokenDescription: 'A conditional predicate: target.IsShielded == true.'
   floatValue: 1
   intValue: 0
-  rarity: 0
+  boolValue: 0
+  rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100

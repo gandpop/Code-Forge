@@ -15,10 +15,11 @@ MonoBehaviour:
   tokenName: Integer
   tokenType: 4
   codeDisplaySyntax: 100
+  description: Sets maximum health pool to 100 HP.
   floatValue: 0
   intValue: 100
+  boolValue: 0
   rarity: 0
-  canSpawnAsReward: 1
+  canSpawnAsReward: 0
   overrideSpawnChance: 0
   customSpawnChance: 100
-  description: Sets maximum health pool to 100 HP.

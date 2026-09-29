@@ -3,6 +3,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using TMPro;
 using CodeForge.Data;
+using CodeForge.Combat;
 
 namespace CodeForge.UI
 {
@@ -114,7 +115,13 @@ namespace CodeForge.UI
             }
 
             var draggedCard = eventData.pointerDrag?.GetComponent<DraggableTokenCardUI>();
-            if (draggedCard == null || draggedCard.Token == null) return;
+            if (draggedCard == null) return;
+
+            if (draggedCard.Token == null)
+            {
+                ConsoleLogUI.Log("<color=#FF5454>[Warning] Cannot slot an uninitialized or empty token card.</color>");
+                return;
+            }
 
             if (!IsTypeCompatible(draggedCard.Token.tokenType, expectedType))
             {
@@ -152,8 +159,21 @@ namespace CodeForge.UI
                 {
                     codeEditorUI.AddTokenToInventory(oldToken);
                 }
+                if (IsStatDisplayRole(socketRole))
+                {
+                    EditorUI?.UpdateChanceRowDisplays();
+                }
+                OnTokenAssignedOrRemoved();
                 ConsoleLogUI.Log($"[Syntax] Unslotted token from {socketRole}.");
             }
+        }
+
+        private static bool IsStatDisplayRole(CodeSocketRole role)
+        {
+            return role == CodeSocketRole.CritChance || role == CodeSocketRole.CritChancePercent ||
+                   role == CodeSocketRole.CritMultiplier || role == CodeSocketRole.CritDamage ||
+                   role == CodeSocketRole.EvasionChance || role == CodeSocketRole.EvasionChancePercent ||
+                   role == CodeSocketRole.DamageReduction || role == CodeSocketRole.DamageMultiplier;
         }
 
         public void AssignToken(CodeTokenSO token)
@@ -166,6 +186,34 @@ namespace CodeForge.UI
 
             AssignedToken = token;
             RefreshDisplay();
+
+            if (IsStatDisplayRole(socketRole))
+            {
+                EditorUI?.UpdateChanceRowDisplays();
+            }
+            OnTokenAssignedOrRemoved();
+        }
+
+        public void OnTokenAssignedOrRemoved()
+        {
+            if (socketRole == CodeSocketRole.MaxHealth)
+            {
+                int newHp = AssignedToken != null ? AssignedToken.intValue : 20;
+                var player = Object.FindFirstObjectByType<PlayerCombatController>();
+                if (player != null)
+                {
+                    player.SetMaxHealth(newHp);
+                }
+            }
+            else if (socketRole == CodeSocketRole.BaseShield)
+            {
+                int newShield = AssignedToken != null ? AssignedToken.intValue : 0;
+                var player = Object.FindFirstObjectByType<PlayerCombatController>();
+                if (player != null)
+                {
+                    player.SetShield(newShield);
+                }
+            }
         }
 
         public void RefreshDisplay()
@@ -184,6 +232,7 @@ namespace CodeForge.UI
                     CodeTokenType.Int => $"<color=#B5CEA8>{syntax}</color>",
                     CodeTokenType.Bool => $"<color=#569CD6>{syntax}</color>",
                     CodeTokenType.Stance => $"<color=#4EC9B0>{syntax}</color>",
+                    CodeTokenType.Operator => $"<color=#D4D4D4>{syntax}</color>",
                     _ => $"<color=#D4D4D4>{syntax}</color>"
                 };
 
@@ -194,12 +243,13 @@ namespace CodeForge.UI
                 string prompt = expectedType switch
                 {
                     CodeTokenType.Targeting => "<color=#6E6E6E>[ <color=#C586C0>target</color> ]</color>",
-                    CodeTokenType.Condition => "<color=#6E6E6E>[ <color=#9CDCFE>condition</color> ]</color>",
+                    CodeTokenType.Condition => "<color=#6E6E6E>[ <color=#9CDCFE>condition</color> / <color=#569CD6>bool</color> ]</color>",
                     CodeTokenType.Action => "<color=#6E6E6E>[ <color=#DCDCAA>action</color> ]</color>",
                     CodeTokenType.Float => "<color=#6E6E6E>[ <color=#B5CEA8>float</color> ]</color>",
                     CodeTokenType.Int => "<color=#6E6E6E>[ <color=#B5CEA8>int</color> ]</color>",
                     CodeTokenType.Bool => "<color=#6E6E6E>[ <color=#569CD6>bool</color> ]</color>",
                     CodeTokenType.Stance => "<color=#6E6E6E>[ <color=#4EC9B0>stance</color> ]</color>",
+                    CodeTokenType.Operator => "<color=#6E6E6E>[ <color=#D4D4D4>op</color> ]</color>",
                     _ => "<color=#6E6E6E>[ select ]</color>"
                 };
 
@@ -268,7 +318,11 @@ namespace CodeForge.UI
 
         private void LogTypeMismatchError(CodeTokenSO token, CodeTokenType targetType)
         {
-            ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] CS0029: Cannot implicitly convert type '{token.tokenType.ToString().ToLower()}' to '{targetType.ToString().ToLower()}'</color>");
+            var row = GetComponentInParent<EditorLineRowUI>();
+            int lineNum = row != null ? row.lineNumber : 0;
+            string lineLocation = lineNum > 0 ? $"PlayerCombat.cs({lineNum}): error " : "";
+            string onLine = lineNum > 0 ? $" on line {lineNum}" : "";
+            ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] {lineLocation}CS0029: Cannot implicitly convert type '{token.tokenType.ToString().ToLower()}' to '{targetType.ToString().ToLower()}'{onLine}.</color>");
             StopAllCoroutines();
             StartCoroutine(FlashRedRoutine(0.4f));
         }

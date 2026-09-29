@@ -15,9 +15,12 @@ MonoBehaviour:
   tokenName: Heavy Hit Reaction
   tokenType: 1
   codeDisplaySyntax: incomingDamage >= 8
+  description: 'A conditional predicate: incomingDamage >= 8.'
+  tokenDescription: 'A conditional predicate: incomingDamage >= 8.'
   floatValue: 1
   intValue: 0
-  rarity: 1
+  boolValue: 0
+  rarity: 2
   canSpawnAsReward: 1
   overrideSpawnChance: 0
   customSpawnChance: 100

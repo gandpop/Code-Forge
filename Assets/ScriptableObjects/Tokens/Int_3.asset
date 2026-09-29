@@ -14,11 +14,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.CodeTokenSO
   tokenName: Integer
   tokenType: 4
-  rarity: 1
-  canSpawnAsReward: 1
-  overrideSpawnChance: 0
-  customSpawnChance: 100
+  codeDisplaySyntax: 3
+  description: An authentic integer token representing 3. Used for max health, flat
+    damage/shield, or whole percentages.
+  tokenDescription: An authentic integer token representing 3. Used for max health,
+    flat damage/shield, or whole percentages.
   floatValue: 0
   intValue: 3
   boolValue: 0
-  targetPriorityValue: 0
+  rarity: 0
+  canSpawnAsReward: 1
+  overrideSpawnChance: 0
+  customSpawnChance: 100

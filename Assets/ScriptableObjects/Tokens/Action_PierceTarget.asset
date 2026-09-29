@@ -14,9 +14,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.ActionTokenSO
   tokenName: Pierce Target
   tokenType: 2
-  codeDisplaySyntax: target.PierceDamage(8)
+  codeDisplaySyntax: target.PierceDamage(8);
+  description: Deals 8 piercing damage ignoring enemy shield.
+  tokenDescription: Deals 8 piercing damage ignoring enemy shield.
   floatValue: 1
   intValue: 0
+  boolValue: 0
   rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0
@@ -25,4 +28,3 @@ MonoBehaviour:
   baseValue: 8
   isAreaOfEffect: 0
   isPiercing: 1
-  description: Deals 8 piercing damage ignoring enemy shield.

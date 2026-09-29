@@ -15,8 +15,11 @@ MonoBehaviour:
   tokenName: Threat Priority
   tokenType: 0
   codeDisplaySyntax: Enemies.TargetAttacker()
+  description: 'Target selection query: Enemies.TargetAttacker().'
+  tokenDescription: 'Target selection query: Enemies.TargetAttacker().'
   floatValue: 1
   intValue: 0
+  boolValue: 0
   rarity: 1
   canSpawnAsReward: 1
   overrideSpawnChance: 0

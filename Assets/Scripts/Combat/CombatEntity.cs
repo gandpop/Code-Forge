@@ -33,6 +33,13 @@ namespace CodeForge.Combat
             OnShieldChanged?.Invoke(CurrentShield);
         }
 
+        public virtual void SetShield(int amount)
+        {
+            if (IsDead) return;
+            CurrentShield = Mathf.Max(0, amount);
+            OnShieldChanged?.Invoke(CurrentShield);
+        }
+
         public virtual void TakeDamage(float amount, bool isPiercing = false)
         {
             if (IsDead) return;

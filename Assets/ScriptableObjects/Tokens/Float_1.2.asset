@@ -15,10 +15,12 @@ MonoBehaviour:
   tokenName: Float
   tokenType: 3
   codeDisplaySyntax: 1.2f
+  description: Multiplies offensive damage output by 1.2x.
+  tokenDescription: Multiplies offensive damage output by 1.2x.
   floatValue: 1.2
   intValue: 0
+  boolValue: 0
   rarity: 0
-  canSpawnAsReward: 1
+  canSpawnAsReward: 0
   overrideSpawnChance: 0
   customSpawnChance: 100
-  description: Multiplies offensive damage output by 1.2x.

@@ -63,7 +63,7 @@ namespace CodeForge.Combat
 
         public void ApplyBleed(int damagePerTurn, int duration)
         {
-            if (IsDead) return;
+            if (IsDead || duration <= 0 || damagePerTurn <= 0) return;
             currentBleedDamage = Mathf.Max(currentBleedDamage, damagePerTurn);
             currentBleedDuration = Mathf.Max(currentBleedDuration, duration);
             ConsoleLogUI.Log($"<color=#E06C75>[Status] {gameObject.name} inflicted with Bleed ({currentBleedDamage} DMG/turn for {currentBleedDuration} turns)!</color>");
@@ -72,23 +72,64 @@ namespace CodeForge.Combat
         public EnemyIntent CurrentIntent { get; private set; }
         public event Action<EnemyIntent> OnIntentChanged;
 
+        private Transform visualChild;
+        private Vector3 visualOriginalPos;
+
         protected override void Awake()
         {
             base.Awake();
             originalLocalPos = transform.localPosition;
+            EnsureVisualChild();
+        }
+
+        public void EnsureVisualChild()
+        {
+            if (visualChild != null) return;
+
+            visualChild = transform.Find("Visual") ?? transform.Find("Sprite") ?? transform.Find("Cube");
+            if (visualChild == null)
+            {
+                var meshFilter = GetComponent<MeshFilter>();
+                var meshRenderer = GetComponent<MeshRenderer>();
+                if (meshFilter != null && meshRenderer != null)
+                {
+                    GameObject vObj = new GameObject("Visual", typeof(MeshFilter), typeof(MeshRenderer));
+                    vObj.transform.SetParent(transform, false);
+                    vObj.transform.localPosition = Vector3.zero;
+                    vObj.transform.localRotation = Quaternion.identity;
+                    vObj.transform.localScale = Vector3.one;
+
+                    var childMF = vObj.GetComponent<MeshFilter>();
+                    childMF.sharedMesh = meshFilter.sharedMesh;
+                    var childMR = vObj.GetComponent<MeshRenderer>();
+                    childMR.sharedMaterials = meshRenderer.sharedMaterials;
+
+                    Destroy(meshRenderer);
+                    Destroy(meshFilter);
+                    visualChild = vObj.transform;
+                }
+            }
+            if (visualChild != null)
+            {
+                visualOriginalPos = visualChild.localPosition;
+            }
         }
 
         private void Update()
         {
+            EnsureVisualChild();
+            Transform vTr = visualChild != null ? visualChild : transform;
+            Vector3 basePos = visualChild != null ? visualOriginalPos : originalLocalPos;
+
             if (CurrentIntent.intentType == EnemyIntentType.Charge && !IsDead && !isLunging)
             {
                 float shakeX = (Mathf.PerlinNoise(Time.time * 30f, 0f) - 0.5f) * 0.12f;
                 float shakeY = (Mathf.PerlinNoise(0f, Time.time * 30f) - 0.5f) * 0.12f;
-                transform.localPosition = originalLocalPos + new Vector3(shakeX, shakeY, 0f);
+                vTr.localPosition = basePos + new Vector3(shakeX, shakeY, 0f);
             }
-            else if (!isLunging && transform.localPosition != originalLocalPos)
+            else if (!isLunging && vTr.localPosition != basePos)
             {
-                transform.localPosition = originalLocalPos;
+                vTr.localPosition = basePos;
             }
         }
 
@@ -228,28 +269,34 @@ namespace CodeForge.Combat
             switch (CurrentIntent.intentType)
             {
                 case EnemyIntentType.Attack:
-                    yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.4f, -0.2f, 0f), 0.12f));
                     if (target != null && !target.IsDead)
                     {
-                        if (target is PlayerCombatController playerCombat)
+                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.4f, -0.2f, 0f), 0.10f, () =>
+                        {
+                            target.TakeDamage(CurrentIntent.projectedValue);
+                            ConsoleLogUI.Log($"[Enemy] {gameObject.name} attacks Player for {CurrentIntent.projectedValue} DMG!");
+                        }));
+
+                        if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
                         {
                             yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(CurrentIntent.projectedValue));
                         }
-                        target.TakeDamage(CurrentIntent.projectedValue);
-                        ConsoleLogUI.Log($"[Enemy] {gameObject.name} attacks Player for {CurrentIntent.projectedValue} DMG!");
                     }
                     break;
 
                 case EnemyIntentType.HeavyHit:
-                    yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.6f, -0.3f, 0f), 0.18f));
                     if (target != null && !target.IsDead)
                     {
-                        if (target is PlayerCombatController playerCombat)
+                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.6f, -0.3f, 0f), 0.14f, () =>
+                        {
+                            target.TakeDamage(CurrentIntent.projectedValue);
+                            ConsoleLogUI.Log($"[Enemy] {gameObject.name} lands HEAVY STRIKE on Player for {CurrentIntent.projectedValue} DMG!");
+                        }));
+
+                        if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
                         {
                             yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(CurrentIntent.projectedValue));
                         }
-                        target.TakeDamage(CurrentIntent.projectedValue);
-                        ConsoleLogUI.Log($"[Enemy] {gameObject.name} lands HEAVY STRIKE on Player for {CurrentIntent.projectedValue} DMG!");
                     }
                     break;
 
@@ -274,29 +321,34 @@ namespace CodeForge.Combat
             yield return new WaitForSeconds(0.2f);
         }
 
-        private IEnumerator PerformAttackLunge(Vector3 offset, float duration = 0.12f)
+        private IEnumerator PerformAttackLunge(Vector3 offset, float duration = 0.10f, Action onApex = null)
         {
             isLunging = true;
-            Vector3 startPos = transform.position;
+            EnsureVisualChild();
+            Transform targetTr = visualChild != null ? visualChild : transform;
+            Vector3 startPos = visualChild != null ? visualOriginalPos : originalLocalPos;
             Vector3 targetPos = startPos + offset;
 
             float elapsed = 0f;
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                transform.position = Vector3.Lerp(startPos, targetPos, elapsed / duration);
+                targetTr.localPosition = Vector3.Lerp(startPos, targetPos, elapsed / duration);
                 yield return null;
             }
+            targetTr.localPosition = targetPos;
+
+            onApex?.Invoke();
 
             elapsed = 0f;
             while (elapsed < duration)
             {
                 elapsed += Time.deltaTime;
-                transform.position = Vector3.Lerp(targetPos, startPos, elapsed / duration);
+                targetTr.localPosition = Vector3.Lerp(targetPos, startPos, elapsed / duration);
                 yield return null;
             }
 
-            transform.position = startPos;
+            targetTr.localPosition = startPos;
             isLunging = false;
         }
     }

@@ -15,10 +15,11 @@ MonoBehaviour:
   tokenName: Integer
   tokenType: 4
   codeDisplaySyntax: 140
+  description: Sets maximum health pool to a fortified 140 HP.
   floatValue: 0
   intValue: 140
+  boolValue: 0
   rarity: 2
-  canSpawnAsReward: 1
+  canSpawnAsReward: 0
   overrideSpawnChance: 0
   customSpawnChance: 80
-  description: Sets maximum health pool to a fortified 140 HP.

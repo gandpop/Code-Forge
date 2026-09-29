@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 namespace CodeForge.UI
 {
     [ExecuteAlways]
-    public class EditorLineRowUI : MonoBehaviour
+    public class EditorLineRowUI : MonoBehaviour, IDropHandler
     {
         public int lineNumber = 1;
         [SerializeField] private TextMeshProUGUI lineNumberText;
@@ -138,6 +139,45 @@ namespace CodeForge.UI
             {
                 LayoutRebuilder.ForceRebuildLayoutImmediate(rowRt);
             }
+        }
+
+        public void OnDrop(PointerEventData eventData)
+        {
+            var draggedCard = eventData.pointerDrag?.GetComponent<DraggableTokenCardUI>();
+            if (draggedCard == null || draggedCard.Token == null) return;
+
+            var sockets = GetComponentsInChildren<CodeSocketUI>();
+            if (sockets == null || sockets.Length == 0) return;
+
+            // If single socket on line, forward directly
+            if (sockets.Length == 1)
+            {
+                sockets[0].OnDrop(eventData);
+                return;
+            }
+
+            // If multiple sockets, find first empty compatible socket
+            foreach (var s in sockets)
+            {
+                if (s.AssignedToken == null && CodeSocketUI.IsTypeCompatible(draggedCard.Token.tokenType, s.expectedType))
+                {
+                    s.OnDrop(eventData);
+                    return;
+                }
+            }
+
+            // Fallback: first compatible socket
+            foreach (var s in sockets)
+            {
+                if (CodeSocketUI.IsTypeCompatible(draggedCard.Token.tokenType, s.expectedType))
+                {
+                    s.OnDrop(eventData);
+                    return;
+                }
+            }
+
+            // Fallback: let first socket handle it (reports CS0029 error)
+            sockets[0].OnDrop(eventData);
         }
 
         public static string NormalizeCodeSpacing(string text)
