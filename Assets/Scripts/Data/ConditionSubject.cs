@@ -5,6 +5,7 @@ namespace CodeForge.Data
         TargetHealthPercent,
         TargetIsShielded,
         TargetIntendingAttack,
+        TargetIsCharging,
         PlayerHealthPercent,
         TurnCountIsEven,
         IncomingDamage

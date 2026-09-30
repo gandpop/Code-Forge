@@ -13,7 +13,7 @@ namespace CodeForge.Combat
         public float DamageMultiplier { get; set; } = 1.0f;
         public int BaseShield { get; set; } = 0;
         public int CritChancePercent { get; set; } = 0;
-        public float CritMultiplier { get; set; } = 1.5f;
+        public float CritMultiplier { get; set; } = 1.1f;
         public int EvasionChancePercent { get; set; } = 0;
         public int DamageReduction { get; set; } = 0;
 
@@ -44,6 +44,19 @@ namespace CodeForge.Combat
         {
             SetShield(amount);
             ConsoleLogUI.Log($"[Start] Executed player.AddStartingShield({amount}) -> Current Shield: {CurrentShield}.");
+        }
+
+        public void Heal(int amount)
+        {
+            base.Heal(amount);
+            ConsoleLogUI.Log($"<color=#98C379>[Action] Player restored +{amount} HP (Current HP: {Mathf.CeilToInt(CurrentHp)}/{Mathf.CeilToInt(MaxHp)})!</color>");
+        }
+
+        public void Overcharge(int shieldAmount, float bonusMultiplier = 0.5f)
+        {
+            AddShield(shieldAmount);
+            DamageMultiplier += bonusMultiplier;
+            ConsoleLogUI.Log($"<color=#E5C07B>[Action] Player OVERCHARGED: +{shieldAmount} Shield, +{bonusMultiplier:0.0#}x Next Attack Multiplier (Total: {DamageMultiplier:0.0#}x)!</color>");
         }
 
         [System.Obsolete]
@@ -156,7 +169,7 @@ namespace CodeForge.Combat
                 editorUI.HighlightLine(31, true);
             }
             EnemyEntity target = targetingToken != null
-                ? targetingToken.ResolveTarget(context.ActiveEnemies)
+                ? targetingToken.ResolveTarget(context.ActiveEnemies, this)
                 : SelectFallbackTarget(context.ActiveEnemies);
 
             string targetSyntax = targetingToken != null ? targetingToken.GetFormattedCodeString() : "Enemies.Random()";

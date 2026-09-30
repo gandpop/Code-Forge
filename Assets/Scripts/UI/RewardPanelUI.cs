@@ -202,20 +202,6 @@ namespace CodeForge.UI
 
             if (eligibleTokens.Count == 0) return;
 
-            // Room progression unlock announcements
-            if (roomIndex == 1)
-            {
-                ConsoleLogUI.Log("[Unlock] Clear Room 1 complete! Unlocked Section 1: Class Fields (damageMultiplier & baseShield)!");
-            }
-            else if (roomIndex == 2)
-            {
-                ConsoleLogUI.Log("[Unlock] Clear Room 2 complete! Unlocked Section 3: Event Callback OnTakeDamage(int incomingDamage)!");
-            }
-            else if (roomIndex >= 3)
-            {
-                ConsoleLogUI.Log("[Unlock] Clear Room 3 complete! Full Roguelike Architecture Unlocked!");
-            }
-
             List<CodeTokenSO> draftedTokens = new List<CodeTokenSO>();
 
             // Room 1 onboarding guard: draw 3 different categories (Stat, Logic, Action) with weighted random selection

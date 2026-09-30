@@ -10,6 +10,7 @@ namespace CodeForge.UI
     public class DraggableTokenCardUI : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
     {
         public CodeTokenSO Token { get; private set; }
+        public int AcquisitionOrder { get; set; } = 0;
 
         [SerializeField] private TextMeshProUGUI cardText;
         [SerializeField] private Image cardBackground;

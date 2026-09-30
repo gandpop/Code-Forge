@@ -12,6 +12,112 @@ namespace CodeForge.UI
         [SerializeField] private TextMeshProUGUI lineNumberText;
         [SerializeField] private Image lineHighlightImage;
 
+        [Header("Code Folding")]
+        [SerializeField] private Button foldToggleButton;
+        [SerializeField] private TextMeshProUGUI foldToggleText;
+        [SerializeField] private System.Collections.Generic.List<EditorLineRowUI> childRows = new System.Collections.Generic.List<EditorLineRowUI>();
+        public bool isFolded = false;
+
+        public System.Collections.Generic.List<EditorLineRowUI> ChildRows => childRows;
+        public Button FoldToggleButton => foldToggleButton;
+        public TextMeshProUGUI FoldToggleText => foldToggleText;
+
+        public void SetupFoldToggle(System.Collections.Generic.List<EditorLineRowUI> children)
+        {
+            childRows = children ?? new System.Collections.Generic.List<EditorLineRowUI>();
+            EnsureFoldButton();
+            UpdateFoldDisplay();
+        }
+
+        public void EnsureFoldButton()
+        {
+            if (foldToggleButton == null)
+            {
+                var foldObj = transform.Find("FoldToggleBtn")?.gameObject;
+                if (foldObj == null)
+                {
+                    foldObj = new GameObject("FoldToggleBtn", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(LayoutElement));
+                    foldObj.transform.SetParent(transform, false);
+                    foldObj.transform.SetSiblingIndex(2);
+
+                    var rt = foldObj.GetComponent<RectTransform>();
+                    rt.sizeDelta = new Vector2(18f, 18f);
+
+                    var le = foldObj.GetComponent<LayoutElement>();
+                    le.minWidth = 18f;
+                    le.preferredWidth = 18f;
+                    le.minHeight = 18f;
+                    le.preferredHeight = 18f;
+
+                    var img = foldObj.GetComponent<Image>();
+                    img.color = new Color(0.18f, 0.20f, 0.25f, 0.7f);
+
+                    var txtObj = new GameObject("Txt", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                    txtObj.transform.SetParent(foldObj.transform, false);
+                    var trt = txtObj.GetComponent<RectTransform>();
+                    trt.anchorMin = Vector2.zero;
+                    trt.anchorMax = Vector2.one;
+                    trt.sizeDelta = Vector2.zero;
+
+                    foldToggleText = txtObj.GetComponent<TextMeshProUGUI>();
+                    foldToggleText.alignment = TextAlignmentOptions.Center;
+                    foldToggleText.fontSize = 11f;
+                    foldToggleText.fontStyle = FontStyles.Bold;
+                    foldToggleText.color = new Color(0.7f, 0.75f, 0.85f, 1f);
+                    foldToggleText.raycastTarget = false;
+                    foldToggleText.text = "[-]";
+
+                    foldToggleButton = foldObj.GetComponent<Button>();
+                }
+                else
+                {
+                    foldToggleButton = foldObj.GetComponent<Button>();
+                    foldToggleText = foldObj.GetComponentInChildren<TextMeshProUGUI>(true);
+                }
+            }
+
+            if (foldToggleButton != null)
+            {
+                foldToggleButton.onClick.RemoveAllListeners();
+                foldToggleButton.onClick.AddListener(ToggleFold);
+            }
+        }
+
+        public void ToggleFold()
+        {
+            SetFolded(!isFolded);
+        }
+
+        public void SetFolded(bool fold)
+        {
+            isFolded = fold;
+            if (childRows != null)
+            {
+                foreach (var row in childRows)
+                {
+                    if (row != null && row != this)
+                    {
+                        row.gameObject.SetActive(!isFolded);
+                    }
+                }
+            }
+            UpdateFoldDisplay();
+
+            if (transform.parent != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(transform.parent as RectTransform);
+            }
+        }
+
+        private void UpdateFoldDisplay()
+        {
+            if (foldToggleText != null)
+            {
+                foldToggleText.text = isFolded ? "[+]" : "[-]";
+                foldToggleText.color = isFolded ? new Color(1f, 0.85f, 0.4f, 1f) : new Color(0.7f, 0.75f, 0.85f, 1f);
+            }
+        }
+
         private void Awake()
         {
             FormatRow();
@@ -68,7 +174,7 @@ namespace CodeForge.UI
                 layout.childForceExpandWidth = false;
                 layout.childForceExpandHeight = false;
                 layout.childAlignment = TextAnchor.MiddleLeft;
-                layout.padding = new RectOffset(0, 0, 0, 0);
+                layout.padding = new RectOffset(6, 0, 0, 0);
             }
 
             Transform hlTr = transform.Find("LineHighlight");
@@ -83,25 +189,40 @@ namespace CodeForge.UI
                 le.ignoreLayout = true;
             }
 
-            Transform numContainer = transform.Find("LineNumberContainer");
-            if (numContainer != null)
+            // Gutter is always Sibling 1 (fixed 28px width)
+            Transform gutterTr = transform.Find("Gutter") ?? transform.Find("LineNumberContainer");
+            if (gutterTr != null)
             {
-                var rt = numContainer.GetComponent<RectTransform>();
-                if (rt != null) rt.sizeDelta = new Vector2(36f, 20f);
-                var le = numContainer.GetComponent<LayoutElement>();
-                if (le != null)
-                {
-                    le.minWidth = 36f;
-                    le.preferredWidth = 36f;
-                    le.minHeight = 20f;
-                    le.preferredHeight = 20f;
-                }
+                gutterTr.SetSiblingIndex(1);
+                var rt = gutterTr.GetComponent<RectTransform>();
+                if (rt != null) rt.sizeDelta = new Vector2(28f, 20f);
+                var le = gutterTr.GetComponent<LayoutElement>() ?? gutterTr.gameObject.AddComponent<LayoutElement>();
+                le.minWidth = 28f;
+                le.preferredWidth = 28f;
+                le.minHeight = 20f;
+                le.preferredHeight = 20f;
+            }
+
+            // FoldToggleBtn is always Sibling 2 (fixed 18px width, between Gutter and CodeText)
+            Transform foldTr = transform.Find("FoldToggleBtn");
+            if (foldTr != null)
+            {
+                foldTr.SetSiblingIndex(2);
+                var rt = foldTr.GetComponent<RectTransform>();
+                if (rt != null) rt.sizeDelta = new Vector2(18f, 18f);
+                var le = foldTr.GetComponent<LayoutElement>() ?? foldTr.gameObject.AddComponent<LayoutElement>();
+                le.minWidth = 18f;
+                le.preferredWidth = 18f;
+                le.minHeight = 18f;
+                le.preferredHeight = 18f;
             }
 
             var texts = GetComponentsInChildren<TextMeshProUGUI>(true);
             foreach (var tmp in texts)
             {
                 if (tmp == lineNumberText) continue;
+                if (tmp == foldToggleText) continue;
+                if (foldToggleButton != null && tmp.transform.IsChildOf(foldToggleButton.transform)) continue;
                 if (tmp.GetComponentInParent<CodeSocketUI>() != null) continue;
 
                 tmp.text = NormalizeCodeSpacing(tmp.text);

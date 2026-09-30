@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7a1f893e110245a4980d4b29ce450002, type: 3}
+  m_Name: Condition_EnemyShielded
+  m_EditorClassIdentifier: Assembly-CSharp::CodeForge.Data.ConditionTokenSO
+  tokenName: Enemy Has Shield
+  tokenType: 1
+  codeDisplaySyntax: target.IsShielded
+  description: Evaluates to true when the target has active shield points.
+  tokenDescription: Evaluates to true when the target has active shield points.
+  floatValue: 1
+  intValue: 0
+  boolValue: 0
+  rarity: 0
+  canSpawnAsReward: 1
+  overrideSpawnChance: 0
+  customSpawnChance: 100
+  subject: 1
+  op: 2
+  comparisonValue: 1

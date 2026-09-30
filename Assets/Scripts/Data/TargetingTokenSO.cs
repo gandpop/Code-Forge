@@ -20,9 +20,10 @@ namespace CodeForge.Data
             tokenType = CodeTokenType.Targeting;
         }
 
-        public EnemyEntity ResolveTarget(List<EnemyEntity> activeEnemies)
+        public EnemyEntity ResolveTarget(List<EnemyEntity> activeEnemies, PlayerCombatController player = null)
         {
             if (activeEnemies == null || activeEnemies.Count == 0) return null;
+            if (player == null) player = Object.FindFirstObjectByType<PlayerCombatController>();
 
             EnemyEntity candidate = null;
 
@@ -61,8 +62,15 @@ namespace CodeForge.Data
                         }
                         break;
 
+                    case TargetPriority.Closest:
                     case TargetPriority.FirstInLine:
-                        // First valid candidate already selected
+                        float playerX = player != null ? player.transform.position.x : -2.0f;
+                        float enemyDist = Mathf.Abs(enemy.transform.position.x - playerX);
+                        float candidateDist = Mathf.Abs(candidate.transform.position.x - playerX);
+                        if (enemyDist < candidateDist)
+                        {
+                            candidate = enemy;
+                        }
                         break;
 
                     case TargetPriority.BossOnly:
@@ -87,6 +95,17 @@ namespace CodeForge.Data
                             }
                         }
                         else if (!candidateCharging && enemy.CurrentHp < candidate.CurrentHp)
+                        {
+                            candidate = enemy;
+                        }
+                        break;
+
+                    case TargetPriority.HighestShield:
+                        if (enemy.CurrentShield > candidate.CurrentShield)
+                        {
+                            candidate = enemy;
+                        }
+                        else if (enemy.CurrentShield == candidate.CurrentShield && enemy.CurrentHp < candidate.CurrentHp)
                         {
                             candidate = enemy;
                         }

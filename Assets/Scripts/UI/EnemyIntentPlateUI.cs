@@ -80,6 +80,7 @@ namespace CodeForge.UI
                     EnemyIntentType.Shield => $"<color=#44AAFF><b>{intent.GetBadgeText()}</b></color>",
                     EnemyIntentType.Charge => $"<color=#FFDD44><b>{intent.GetBadgeText()}</b></color>",
                     EnemyIntentType.Buff => $"<color=#FFA94D><b>{intent.GetBadgeText()}</b></color>",
+                    EnemyIntentType.Debuff => $"<color=#C678DD><b>{intent.GetBadgeText()}</b></color>",
                     _ => $"<color=#CCCCCC><b>{intent.GetBadgeText()}</b></color>"
                 };
 
@@ -93,6 +94,7 @@ namespace CodeForge.UI
                     EnemyIntentType.HeavyHit => new Color(0.4f, 0.1f, 0.1f, 0.9f),
                     EnemyIntentType.Shield => new Color(0.1f, 0.2f, 0.4f, 0.9f),
                     EnemyIntentType.Charge => new Color(0.35f, 0.25f, 0.05f, 0.9f),
+                    EnemyIntentType.Debuff => new Color(0.3f, 0.1f, 0.35f, 0.9f),
                     _ => new Color(0.12f, 0.12f, 0.16f, 0.9f)
                 };
             }

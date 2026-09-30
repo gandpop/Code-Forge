@@ -1,232 +1,192 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v17.0)
-## Project: CodeForge — Multiplier Compounding, Flat Armor Int, Reward Duplication Elimination, Console Auto-Scroll & Popover Polish
+# ARCHITECTURAL PLAN & SPECIFICATION (v21.0)
+## Project: CodeForge — Crit Compounding Baseline (1.1x), Gutter/Fold Column Alignment, Enemies.Closest(), Full Rarity Sorting, & Dynamic 1-to-3 Enemy Encounters
 
 ---
 
 ## 1. Executive Summary & Design Evaluation
 
-### 1.1 Pedagogical Critique: Float Identity & The Multiplier King
-* **The Problem:** Using `float` for `damageReduction` as a decimal fraction (`0.10f` - `0.50f`) was cognitively jarring for novice programmers. Learners expect integer percentages or flat armor, and slotting `1.1f` into a damage reduction slot triggered awkward clamping warnings. With the removal of `0.x` fractional floats, learners risked feeling that floats lacked purpose in the script.
-* **The Solution — Multiplicative Synergy:**
-  1. **Convert `damageReduction` to Flat Armor (`int`):**
-     - Variable definition: `int damageReduction = [ 3 ];`
-     - Damage taken formula: `damageTaken = Mathf.Max(1, incomingDamage - damageReduction);`
-     - Clear pedagogical convention: Integers are for discrete quantities (Health, Armor, Shield, Turn Counts, Dice).
-  2. **Floats as Exponential Scaling Levers:**
-     - Floats now exclusively represent continuous scale factors and multipliers:
-       `float damageMultiplier = [ 1.25f ];`
-       `float critMultiplier = [ 2.00f ];`
-     - **Compounding Critical Strike Formula:**
-       $$\text{Final Damage} = (\text{baseDamage} \times \text{damageMultiplier}) \times \text{critMultiplier}$$
-       *Example:* Slotted `baseDamage = 10`, `damageMultiplier = 1.25f`, `critMultiplier = 1.80f`.
-       Normal Strike: $10 \times 1.25 = 12.5 \approx 13\text{ DMG}$.
-       Critical Strike: $(10 \times 1.25) \times 1.80 = 22.5 \approx 23\text{ DMG}$!
-     - Multipliers compound multiplicatively rather than additively, turning `float` cards into the most exciting offensive build rewards in the game.
+### 1.1 Crit Multiplier Compounding Baseline (1.1x)
+* **The Math Model:** Attack damage follows the strict compounding formula:
+  $$\text{Final Damage} = (\text{baseDamage} \times \text{damageMultiplier}) \times \text{critMultiplier}$$
+* **Why 1.1x Default Fallback:**
+  - With a high baseline (e.g. 1.5x), drafting early float tokens like `Float_1.1`, `Float_1.2`, and `Float_1.25` felt pointless because slotting them lowered the player's crit damage below the default fallback.
+  - Setting the default unslotted fallback to **`1.1x`** guarantees that **every float token in the game ($\ge 1.1f$) is an immediate, palpable upgrade**.
+  - Example: Base damage 10, `damageMultiplier = 1.5f` ($10 \times 1.5 = 15$).
+    - Unslotted baseline: $15 \times 1.1 = 16.5 \approx 17\text{ DMG}$.
+    - Slotting `Float_1.25`: $15 \times 1.25 = 18.75 \approx 19\text{ DMG}$.
+    - Slotting `Float_1.5`: $15 \times 1.5 = 22.5 \approx 23\text{ DMG}$.
+    - Slotting `Float_2.0`: $15 \times 2.0 = 30\text{ DMG}$!
 
-### 1.2 Token Documentation Popover 'X' Raycast Fix
-* **The Issue:** Clicking the 'X' button on the `TokenInspectorPopoverUI` did nothing, while clicking outside dismissed the popover.
-* **Root Cause:**
-  1. The child GameObject `Txt` containing `TextMeshProUGUI` had `raycastTarget = true` by default, intercepting pointer clicks and preventing the underlying `Button` from receiving click events.
-  2. If the popover already existed in the hierarchy at runtime, `BuildUIHierarchyIfNeeded()` returned early, bypassing the programmatic listener attachment for `closeButton`.
-* **Fix:** Explicitly set `closeTxt.raycastTarget = false;` and ensure `closeButton.onClick.AddListener(Hide)` is idempotently hooked in `Awake()`.
+### 1.2 Line-Collapse Gutter Alignment & Left Margin Polish
+* **The Root Cause:**
+  - On foldable lines, `FoldToggleBtn` was placed before `Gutter`, shifting the line number 25px right into the code text.
+  - The fold toggle touched the far left screen edge and got clipped.
+* **The Solution:** Establish a strict, unified column structure across all line rows:
+  $$\text{[Left Margin: 6px]} \longrightarrow \text{[Gutter / Line Number: 28px]} \longrightarrow \text{[Fold Slot: 18px]} \longrightarrow \text{[Code Text]}$$
+  - Line numbers stay vertically aligned in a neat column.
+  - Fold buttons sit cleanly between line numbers and code without pushing text.
 
-### 1.3 Battle Console Auto-Scroll & Off-Screen Overflow Fix
-* **The Issue:** After combat fills the console with ~15–20 lines of text, dragging an invalid token (e.g. `int` into `float` slot) produced no visible compiler error.
-* **Root Cause:**
-  1. In `ConsoleLogUI.Awake()`, `logTextDisplay.rectTransform` was stretched to static anchors (`0.02f` to `0.98f`) without a `ContentSizeFitter`.
-  2. Because the content RectTransform height remained statically locked to the viewport height (~120px), `ScrollRect.verticalNormalizedPosition` could not scroll.
-  3. Subsequent text lines rendered downward past the bottom clipping plane into invisible space.
-* **Fix:** Add a `ContentSizeFitter` (`verticalFit = PreferredSize`) to `logTextDisplay`, set pivot to `(0.5f, 1f)` (top), assign `logScrollRect.viewport = logScrollRect.GetComponent<RectTransform>()`, and scroll to `verticalNormalizedPosition = 0f` whenever new messages are appended.
+### 1.3 Target Selection: `Enemies.Closest()`
+* **Pedagogical Alignment:** Preserves consistent collection-query grammar (`Enemies.LowestHP()`, `Enemies.HighestShield()`, `Enemies.Closest()`).
+* **Implementation:** Calculates horizontal distance: `Mathf.Abs(enemy.transform.position.x - player.transform.position.x)`.
 
-### 1.4 Reward Draft Duplicate Card Elimination
-* **The Issue:** Selecting 2 rewards and clicking `Accept Rewards` added 4 cards (the 2 chosen + 2 exact duplicates) to the inventory.
-* **Root Cause:**
-  1. The `ConfirmRewardsButton` in `MainPrototype.unity` had a persistent UnityEvent targeting `ConfirmSelection()`.
-  2. `EnsureConfirmButton()` in `RewardPanelUI.cs` added a second dynamic listener via `confirmRewardsButton.onClick.AddListener(ConfirmSelection)`.
-  3. `RemoveAllListeners()` does *not* strip persistent scene serialized calls, causing `ConfirmSelection()` to execute twice simultaneously.
-  4. `selectedTokens` was not cleared between invocations, importing both tokens twice into `codeEditorUI.AddTokenToInventory()`.
-* **Fix:** Add an `isConfirming` debounce guard, clear `selectedTokens` immediately, and avoid duplicate listener registrations. Additionally, ensure `DrawWeightedToken` pulls unique items from `eligibleTokens` so drafts never offer identical cards.
+### 1.4 Eliminating Mid-Game Boredom: Rotating 1-, 2-, and 3-Enemy Encounters
+* **The Problem:** After Room 3, the encounter generation defaulted to spawning the exact same two enemies (`Memory_Leak` + `Golem_Elite`) repeatedly forever, leaving 5 other implemented archetypes unused and making combat feel dry and repetitive.
+* **The Solution — Curated & Rotating Encounter Table:**
+  Rotate through all 7 archetypes (`TrainingSlime`, `ShieldBeetle`, `GolemCharger`, `GlassCannon`, `SlimeTank`, `MemoryLeak`, `SyntaxGlitch`) across varied 1-, 2-, and 3-enemy compositions:
+  - **Room 1 (Tutorial):** 1x Training Slime (15 HP, 3 DMG)
+  - **Room 2 (Armor Check):** 1x Shield Beetle (30 HP, 6 DMG / 12 Shield)
+  - **Room 3 (Reaction Check):** 1x Golem Charger (45 HP, 18 DMG Heavy)
+  - **Room 4 (Targeting Puzzle):** 2 Enemies — Slime Tank (Frontline 30 HP, 4 DMG) + Glass Cannon (Backline 20 HP, 9 DMG)
+  - **Room 5 (Disruption Check):** 2 Enemies — Syntax Glitch (28 HP, 8 DMG + Debuff) + Shield Beetle Elite (35 HP, 7 DMG)
+  - **Room 6 (AoE Swarm):** 3 Enemies — 3x Glitch Minions / Slimes (15 HP, 3 DMG each) $\rightarrow$ prime target for cleave/AoE!
+  - **Room 7 (Heavy Dual):** 2 Enemies — Memory Leak (35 HP, 6 DMG lifesteal) + Golem Elite (50 HP, 16 DMG heavy)
+  - **Room 8+ (Boss Encounter):** 3 Enemies — 1x Golem Boss (65 HP, 16 DMG) flanked by 2x Shield Beetles (30 HP, 6 DMG / 10 Shield)
+  - **Infinite Mode (Room 9+):** Rotates through dynamic 2- and 3-enemy compositions with scaling health and damage:
+    $$\text{dmgScale} = 1.0f + (\text{room} - 3) \times 0.15f, \quad \text{hpScale} = 1.0f + (\text{room} - 3) \times 0.20f$$
+
+### 1.5 Token Inventory Shelf Sorting with Full Rarity
+* **Sorting Modes:**
+  - `Standard`: Natural acquisition order.
+  - `Rarity`: `Legendary` (Gold) $\rightarrow$ `Epic` (Purple) $\rightarrow$ `Rare` (Blue) $\rightarrow$ `Uncommon` (Green) $\rightarrow$ `Common` (Gray).
+  - `Type`: `Int` $\rightarrow$ `Float` $\rightarrow$ `Bool` $\rightarrow$ `Action` $\rightarrow$ `Condition` $\rightarrow$ `Targeting` $\rightarrow$ `Operator`.
+* Strictly manual toggle to prevent disorienting card shifting.
 
 ---
 
 ## 2. Technical Specifications & Architecture
 
-### 2.1 Critical Strike & Damage Compounding (`ActionTokenSO.cs` & `PlayerCombatController.cs`)
+### 2.1 Crit Baseline Update (`PlayerCombatController.cs` & `CodeEditorPanelUI.cs`)
 
-#### 2.1.1 `ActionTokenSO.cs` Damage Pipeline
-Update combat resolution in `ActionTokenSO.Execute(...)`:
-```csharp
-bool isCrit = context.Player != null && context.Player.CritChancePercent > 0 && (Random.Range(0, 100) < context.Player.CritChancePercent);
-float dmgMult = context.Player != null ? context.Player.DamageMultiplier : 1.0f;
-float critMult = isCrit ? (context.Player != null ? context.Player.CritMultiplier : 1.5f) : 1.0f;
-
-// Compound formula: (base * damageMultiplier) * critMultiplier
-float baseScaled = actionValue * dmgMult;
-float finalDamage = baseScaled * critMult;
-
-if (isCrit)
-{
-    ConsoleLogUI.Log($"<color=#E5C07B>[Combat] CRITICAL STRIKE! ({actionValue} * {dmgMult:0.0#}x) * {critMult:0.0#}x = {Mathf.RoundToInt(finalDamage)} DMG!</color>");
-}
-```
-
----
-
-### 2.2 Flat Armor Damage Reduction (`CodeSocketRole.cs`, `CodeEditorPanelUI.cs`, `PlayerCombatController.cs`)
-
-#### 2.2.1 Socket Role & DataType Updates
-* Change `damageReductionSocket` expected type to `CodeTokenType.Int`.
-* Update `CodeSocketRole.DamageReduction` handling across `CodeEditorPanelUI.cs` to return `int`:
-```csharp
-public int GetDamageReduction()
-{
-    if (damageReductionSocket != null && damageReductionSocket.AssignedToken != null)
-    {
-        return Mathf.Max(0, damageReductionSocket.AssignedToken.intValue);
-    }
-    return 0;
-}
-```
-
-#### 2.2.2 Flat Armor Mitigation in `PlayerCombatController.cs`
-```csharp
-public void TakeDamage(float amount, bool isPiercing = false)
-{
-    if (amount <= 0f) return;
-
-    // Check Evasion
-    if (!isPiercing && EvasionChancePercent > 0 && Random.Range(0, 100) < EvasionChancePercent)
-    {
-        ConsoleLogUI.Log($"<color=#98C379>[Combat] Player EVADED incoming attack! ({EvasionChancePercent}% Evasion)</color>");
-        return;
-    }
-
-    float incoming = amount;
-    if (!isPiercing && DamageReduction > 0)
-    {
-        float reduced = Mathf.Max(1f, incoming - DamageReduction);
-        ConsoleLogUI.Log($"[Combat] Armor mitigated {incoming - reduced:0} DMG ({DamageReduction} flat Armor). Incoming: {reduced:0} DMG.");
-        incoming = reduced;
-    }
-
-    // Shield absorption then HP deduction...
-}
-```
+* In `PlayerCombatController.cs`:
+  ```csharp
+  public float CritMultiplier { get; set; } = 1.1f;
+  ```
+* In `CodeEditorPanelUI.cs`:
+  ```csharp
+  public float GetCritMultiplier()
+  {
+      if (critMultiplierSocket != null && critMultiplierSocket.AssignedToken != null)
+      {
+          return critMultiplierSocket.AssignedToken.floatValue > 0f ? critMultiplierSocket.AssignedToken.floatValue : 1.1f;
+      }
+      return 1.1f;
+  }
+  ```
+* Update Line 10 comment: `// x (Default: 1.1x)`.
 
 ---
 
-### 2.3 Token Inspector Popover 'X' Button (`TokenInspectorPopoverUI.cs`)
+### 2.2 Gutter & Fold Layout (`EditorLineRowUI.cs`)
 
 ```csharp
-private void Awake()
+public void FormatRow()
 {
-    if (instance == null) instance = this;
-    else if (instance != this) { Destroy(gameObject); return; }
-
-    BuildUIHierarchyIfNeeded();
-    ApplyLayoutDimensions();
-    EnsureBackdrop();
-
-    // Guarantee close button is wired and non-blocking
-    if (closeButton != null)
+    var layout = GetComponent<HorizontalLayoutGroup>();
+    if (layout != null)
     {
-        closeButton.onClick.RemoveAllListeners();
-        closeButton.onClick.AddListener(Hide);
+        layout.spacing = 4f;
+        layout.padding = new RectOffset(6, 6, 0, 0); // 6px left margin
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+    }
 
-        var childTxt = closeButton.GetComponentInChildren<TextMeshProUGUI>();
-        if (childTxt != null)
-        {
-            childTxt.raycastTarget = false; // Prevent eating pointer clicks
-        }
+    Transform gutterTr = transform.Find("Gutter") ?? transform.Find("LineNumberContainer");
+    if (gutterTr != null)
+    {
+        gutterTr.SetSiblingIndex(1);
+        var le = gutterTr.GetComponent<LayoutElement>() ?? gutterTr.gameObject.AddComponent<LayoutElement>();
+        le.minWidth = 28f;
+        le.preferredWidth = 28f;
+    }
+
+    if (foldToggleButton != null)
+    {
+        foldToggleButton.transform.SetSiblingIndex(2);
+        var le = foldToggleButton.GetComponent<LayoutElement>() ?? foldToggleButton.gameObject.AddComponent<LayoutElement>();
+        le.minWidth = 18f;
+        le.preferredWidth = 18f;
     }
 }
 ```
 
 ---
 
-### 2.4 Console Log UI Auto-Scroll & Viewport Setup (`ConsoleLogUI.cs`)
+### 2.3 Curated & Rotating Encounter Spawner (`CombatManager.cs`)
 
 ```csharp
-private void Awake()
+private void SpawnRoomEnemies(int room)
 {
-    instance = this;
-    if (logScrollRect == null)
+    if (enemySpawnContainer != null)
     {
-        logScrollRect = GetComponentInChildren<ScrollRect>(true) ?? GetComponentInParent<ScrollRect>();
+        foreach (Transform child in enemySpawnContainer) Destroy(child.gameObject);
     }
+    activeEnemies.Clear();
 
-    if (logTextDisplay != null)
+    float dmgScale = 1.0f + Mathf.Max(0, room - 3) * 0.15f;
+    float hpScale = 1.0f + Mathf.Max(0, room - 3) * 0.20f;
+
+    switch (room)
     {
-        logTextDisplay.fontSize = 15.5f;
-        logTextDisplay.lineSpacing = 4f;
-
-        var fitter = logTextDisplay.GetComponent<ContentSizeFitter>();
-        if (fitter == null) fitter = logTextDisplay.gameObject.AddComponent<ContentSizeFitter>();
-        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
-
-        var rt = logTextDisplay.rectTransform;
-        rt.anchorMin = new Vector2(0f, 1f);
-        rt.anchorMax = new Vector2(1f, 1f);
-        rt.pivot = new Vector2(0.5f, 1f);
-        rt.anchoredPosition = Vector2.zero;
-    }
-
-    if (logScrollRect != null && logTextDisplay != null)
-    {
-        logScrollRect.content = logTextDisplay.rectTransform;
-        if (logScrollRect.viewport == null)
-        {
-            logScrollRect.viewport = logScrollRect.GetComponent<RectTransform>();
-        }
-    }
-}
-```
-
----
-
-### 2.5 Reward Selection Duplication Elimination (`RewardPanelUI.cs`)
-
-```csharp
-private bool isConfirming = false;
-
-public void ShowRewardPrompt(int roomIndex)
-{
-    isConfirming = false;
-    selectedTokens.Clear();
-    // ...
-}
-
-public void ConfirmSelection()
-{
-    if (isConfirming) return;
-    if (selectedTokens.Count == 0)
-    {
-        ConsoleLogUI.Log("<color=#E5C07B>[Reward] Please select at least 1 token before accepting!</color>");
-        return;
-    }
-
-    isConfirming = true;
-    if (codeEditorUI == null) codeEditorUI = FindFirstObjectByType<CodeEditorPanelUI>(FindObjectsInactive.Include);
-
-    // Copy selected tokens and clear to prevent duplicate delivery
-    var tokensToAdd = new List<CodeTokenSO>(selectedTokens);
-    selectedTokens.Clear();
-
-    foreach (var token in tokensToAdd)
-    {
-        if (token != null && codeEditorUI != null)
-        {
-            codeEditorUI.AddTokenToInventory(token);
-        }
-    }
-
-    ConsoleLogUI.Log($"[Reward] Successfully drafted {tokensToAdd.Count} token(s) into inventory!");
-    Hide();
-
-    if (CombatManager.Instance != null)
-    {
-        CombatManager.Instance.AdvanceToNextRoom();
+        case 1:
+            SpawnEnemy("Training_Slime", new Vector3(2.5f, 1.1f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
+            break;
+        case 2:
+            SpawnEnemy("Shield_Beetle", new Vector3(2.5f, 1.1f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
+            break;
+        case 3:
+            SpawnEnemy("Golem_Charger", new Vector3(2.5f, 1.1f, 0f), 45f, 18f, EnemyArchetype.GolemCharger);
+            break;
+        case 4:
+            // 2 Enemies: Frontline Tank + Backline Glass Cannon
+            SpawnEnemy("Slime_Tank", new Vector3(1.6f, 1.1f, 0f), 30f * hpScale, 4f * dmgScale, EnemyArchetype.SlimeTank);
+            SpawnEnemy("Glass_Cannon", new Vector3(3.4f, 1.1f, 0f), 20f * hpScale, 9f * dmgScale, EnemyArchetype.GlassCannon);
+            break;
+        case 5:
+            // 2 Enemies: Disruptor + Shield Tank
+            SpawnEnemy("Syntax_Glitch", new Vector3(1.6f, 1.1f, 0f), 28f * hpScale, 8f * dmgScale, EnemyArchetype.SyntaxGlitch);
+            SpawnEnemy("Shield_Beetle_Elite", new Vector3(3.4f, 1.1f, 0f), 35f * hpScale, 7f * dmgScale, EnemyArchetype.ShieldBeetle);
+            break;
+        case 6:
+            // 3 Enemies: Swarm Cleave Puzzle
+            SpawnEnemy("Glitch_Bug_A", new Vector3(1.4f, 1.1f, 0f), 16f * hpScale, 3f * dmgScale, EnemyArchetype.Default);
+            SpawnEnemy("Slime_Tank", new Vector3(2.5f, 1.1f, 0f), 32f * hpScale, 4f * dmgScale, EnemyArchetype.SlimeTank);
+            SpawnEnemy("Glitch_Bug_B", new Vector3(3.6f, 1.1f, 0f), 16f * hpScale, 3f * dmgScale, EnemyArchetype.Default);
+            break;
+        case 7:
+            // 2 Enemies: Life Steal + Heavy Charger
+            SpawnEnemy("Memory_Leak", new Vector3(1.6f, 1.1f, 0f), 35f * hpScale, 6f * dmgScale, EnemyArchetype.MemoryLeak);
+            SpawnEnemy("Golem_Elite", new Vector3(3.4f, 1.1f, 0f), 50f * hpScale, 16f * dmgScale, EnemyArchetype.GolemCharger);
+            break;
+        case 8:
+            // 3 Enemies: Boss Encounter (Golem Boss flanked by 2 Shield Beetles)
+            SpawnEnemy("Shield_Beetle_L", new Vector3(1.3f, 1.1f, 0f), 30f * hpScale, 5f * dmgScale, EnemyArchetype.ShieldBeetle);
+            SpawnEnemy("Golem_Boss", new Vector3(2.5f, 1.2f, 0f), 65f * hpScale, 16f * dmgScale, EnemyArchetype.GolemCharger);
+            SpawnEnemy("Shield_Beetle_R", new Vector3(3.7f, 1.1f, 0f), 30f * hpScale, 5f * dmgScale, EnemyArchetype.ShieldBeetle);
+            break;
+        default:
+            // Endless Mode (Rotating Compositions)
+            int cycle = (room - 9) % 3;
+            if (cycle == 0)
+            {
+                SpawnEnemy($"Slime_Tank_R{room}", new Vector3(1.6f, 1.1f, 0f), 35f * hpScale, 5f * dmgScale, EnemyArchetype.SlimeTank);
+                SpawnEnemy($"Glass_Cannon_R{room}", new Vector3(3.4f, 1.1f, 0f), 25f * hpScale, 11f * dmgScale, EnemyArchetype.GlassCannon);
+            }
+            else if (cycle == 1)
+            {
+                SpawnEnemy($"Memory_Leak_R{room}", new Vector3(1.6f, 1.1f, 0f), 40f * hpScale, 7f * dmgScale, EnemyArchetype.MemoryLeak);
+                SpawnEnemy($"Syntax_Glitch_R{room}", new Vector3(3.4f, 1.1f, 0f), 32f * hpScale, 9f * dmgScale, EnemyArchetype.SyntaxGlitch);
+            }
+            else
+            {
+                SpawnEnemy($"Bug_L_R{room}", new Vector3(1.3f, 1.1f, 0f), 20f * hpScale, 4f * dmgScale, EnemyArchetype.Default);
+                SpawnEnemy($"Golem_R{room}", new Vector3(2.5f, 1.2f, 0f), 60f * hpScale, 18f * dmgScale, EnemyArchetype.GolemCharger);
+                SpawnEnemy($"Bug_R_R{room}", new Vector3(3.7f, 1.1f, 0f), 20f * hpScale, 4f * dmgScale, EnemyArchetype.Default);
+            }
+            break;
     }
 }
 ```
@@ -235,8 +195,8 @@ public void ConfirmSelection()
 
 ## 3. Verification & Acceptance Checklist
 
-- [ ] **Crit Multiplier Compounding:** Slotting `damageMultiplier = 1.25f` and `critMultiplier = 2.0f` on a 10 damage attack deals $(10 \times 1.25) \times 2.0 = 25\text{ DMG}$ on crit, clearly reported in the combat log.
-- [ ] **Flat Armor `damageReduction`:** Slotting an integer token into `damageReduction` subtracts flat damage per incoming hit (minimum 1 DMG). No float clamping or decimal conversion.
-- [ ] **Token Inspector 'X' Button:** Clicking the top-right 'X' button immediately closes the popover. Clicking outside also closes the popover.
-- [ ] **Console Error Visibility:** When dragging an `int` token into a `float` socket after battle (when console has 20+ lines), the viewport scrolls to the bottom so `[Compiler Error] CS0029` is immediately visible.
-- [ ] **Reward Draft No Duplicates:** Drafting 2 reward cards adds exactly 2 cards to the inventory shelf (no 4-card duplication).
+- [ ] **Crit Multiplier Baseline (1.1x):** Without a slotted token, `critMultiplier` defaults to `1.1f`. Attack formula is verified as `(baseDamage * damageMultiplier) * critMultiplier`. Any drafted float ($\ge 1.1f$) provides an immediate upgrade over leaving the socket empty.
+- [ ] **Gutter Alignment:** Line numbers stay 100% aligned in a straight vertical column across all lines. Fold toggles sit between the gutter and code without protruding or clipping.
+- [ ] **Targeting Syntax:** The targeting token displays `Enemies.Closest()` and resolves to the closest frontline enemy.
+- [ ] **Dynamic Enemy Variety:** Rooms 1 to 8+ feature rotating compositions (1, 2, and 3 enemies) utilizing all 7 archetypes with progressive scaling.
+- [ ] **Inventory Sorting:** Manual sort chip cycles between Standard, Rarity (Legendary $\rightarrow$ Common), and Type.

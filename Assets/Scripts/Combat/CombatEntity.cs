@@ -40,6 +40,13 @@ namespace CodeForge.Combat
             OnShieldChanged?.Invoke(CurrentShield);
         }
 
+        public virtual void Heal(float amount)
+        {
+            if (IsDead || amount <= 0f) return;
+            CurrentHp = Mathf.Min(maxHp, CurrentHp + amount);
+            OnHealthChanged?.Invoke(CurrentHp, maxHp);
+        }
+
         public virtual void TakeDamage(float amount, bool isPiercing = false)
         {
             if (IsDead) return;

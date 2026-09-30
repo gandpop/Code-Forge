@@ -39,6 +39,22 @@ namespace CodeForge.Data
                 actionValue = editorUI.GetDefendShield();
             }
 
+            if (codeDisplaySyntax != null && codeDisplaySyntax.Contains("Heal"))
+            {
+                int healAmt = Mathf.RoundToInt(actionValue > 0f ? actionValue : 6f);
+                context.Player.Heal(healAmt);
+                yield return new WaitForSeconds(0.25f);
+                yield break;
+            }
+
+            if (codeDisplaySyntax != null && codeDisplaySyntax.Contains("Overcharge"))
+            {
+                int shieldAmt = Mathf.RoundToInt(actionValue > 0f ? actionValue : 10f);
+                context.Player.Overcharge(shieldAmt, 0.5f);
+                yield return new WaitForSeconds(0.25f);
+                yield break;
+            }
+
             switch (category)
             {
                 case ActionCategory.Attack:

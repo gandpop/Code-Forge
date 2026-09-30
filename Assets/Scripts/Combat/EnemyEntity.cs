@@ -11,7 +11,8 @@ namespace CodeForge.Combat
         HeavyHit,   // Charged devastating attack
         Shield,     // Raises armor
         Charge,     // Telegraphing heavy hit (0 DMG this turn)
-        Buff        // Empowering stats
+        Buff,       // Empowering stats
+        Debuff      // Weakens player
     }
 
     public enum EnemyArchetype
@@ -21,7 +22,9 @@ namespace CodeForge.Combat
         ShieldBeetle,    // Turn 1 [SHIELD 12], Turn 2 [ATK 6], repeat
         GlassCannon,     // 9 DMG flat every turn
         SlimeTank,       // 4 DMG flat every turn
-        GolemCharger     // Turn 1 [CHARGE], Turn 2 [CHARGE], Turn 3 [HEAVY 22], repeat
+        GolemCharger,    // Turn 1 [CHARGE], Turn 2 [CHARGE], Turn 3 [HEAVY 22], repeat
+        MemoryLeak,      // 5 DMG, heals on unshielded hit, every 3 turns permanently +2 DMG
+        SyntaxGlitch     // Rotates between [DEBUFF] (reduces player dmgMult by 0.2x) and [ATK 8]
     }
 
     [System.Serializable]
@@ -42,7 +45,8 @@ namespace CodeForge.Combat
             EnemyIntentType.HeavyHit => $"[HEAVY {projectedValue}]",
             EnemyIntentType.Shield => $"[SHIELD {projectedValue}]",
             EnemyIntentType.Charge => projectedValue > 0 ? $"[CHARGING {projectedValue}]" : "[CHARGING!]",
-            EnemyIntentType.Buff => $"[BUFF {projectedValue}]",
+            EnemyIntentType.Buff => $"[BUFF +{projectedValue}]",
+            EnemyIntentType.Debuff => "[DEBUFF]",
             _ => "[IDLE]"
         };
     }
@@ -97,7 +101,7 @@ namespace CodeForge.Combat
                     vObj.transform.SetParent(transform, false);
                     vObj.transform.localPosition = Vector3.zero;
                     vObj.transform.localRotation = Quaternion.identity;
-                    vObj.transform.localScale = Vector3.one;
+                    vObj.transform.localScale = new Vector3(1.3f, 1.3f, 1.3f);
 
                     var childMF = vObj.GetComponent<MeshFilter>();
                     childMF.sharedMesh = meshFilter.sharedMesh;
@@ -111,6 +115,7 @@ namespace CodeForge.Combat
             }
             if (visualChild != null)
             {
+                visualChild.localScale = new Vector3(1.3f, 1.3f, 1.3f);
                 visualOriginalPos = visualChild.localPosition;
             }
         }
@@ -207,11 +212,11 @@ namespace CodeForge.Combat
                     break;
 
                 case EnemyArchetype.ShieldBeetle:
-                    // Odd turns: Shield 12, Even turns: Attack 6
+                    // Odd turns: Shield 12, Even turns: Attack contactDamage (default 6)
                     if (turn % 2 == 1)
                         nextIntent = new EnemyIntent(EnemyIntentType.Shield, 12);
                     else
-                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, 6);
+                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 6f));
                     break;
 
                 case EnemyArchetype.GlassCannon:
@@ -223,12 +228,36 @@ namespace CodeForge.Combat
                     break;
 
                 case EnemyArchetype.GolemCharger:
-                    // Turns 1 & 2: Charge, Turn 3: Heavy 22
+                    // Turns 1 & 2: Charge, Turn 3: Heavy contactDamage (default 18)
                     int cycle = ((turn - 1) % 3) + 1;
                     if (cycle == 3)
-                        nextIntent = new EnemyIntent(EnemyIntentType.HeavyHit, 22);
+                        nextIntent = new EnemyIntent(EnemyIntentType.HeavyHit, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 18f));
                     else
                         nextIntent = new EnemyIntent(EnemyIntentType.Charge, 0);
+                    break;
+
+                case EnemyArchetype.MemoryLeak:
+                    // Turn % 3 == 0: Buff +2 DMG permanently. Otherwise Attack with contactDamage (starts at 5).
+                    if (turn > 1 && turn % 3 == 0)
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Buff, 2);
+                    }
+                    else
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 5f));
+                    }
+                    break;
+
+                case EnemyArchetype.SyntaxGlitch:
+                    // Odd turns: [DEBUFF] (reduces player damage multiplier by 0.2x). Even turns: [ATK contactDamage] (default 8).
+                    if (turn % 2 == 1)
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Debuff, 1);
+                    }
+                    else
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 8f));
+                    }
                     break;
 
                 default:
@@ -271,15 +300,24 @@ namespace CodeForge.Combat
                 case EnemyIntentType.Attack:
                     if (target != null && !target.IsDead)
                     {
+                        float hpBefore = target.CurrentHp;
                         yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.4f, -0.2f, 0f), 0.10f, () =>
                         {
                             target.TakeDamage(CurrentIntent.projectedValue);
                             ConsoleLogUI.Log($"[Enemy] {gameObject.name} attacks Player for {CurrentIntent.projectedValue} DMG!");
                         }));
 
+                        float hpLost = Mathf.Max(0f, hpBefore - target.CurrentHp);
+
+                        if (archetype == EnemyArchetype.MemoryLeak && hpLost > 0f)
+                        {
+                            Heal(hpLost);
+                            ConsoleLogUI.Log($"<color=#98C379>[Enemy] MemoryLeak absorbed {hpLost:0} HP from Player! Healed +{hpLost:0} HP.</color>");
+                        }
+
                         if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
                         {
-                            yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(CurrentIntent.projectedValue));
+                            yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(Mathf.RoundToInt(hpLost)));
                         }
                     }
                     break;
@@ -287,15 +325,18 @@ namespace CodeForge.Combat
                 case EnemyIntentType.HeavyHit:
                     if (target != null && !target.IsDead)
                     {
+                        float hpBefore = target.CurrentHp;
                         yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.6f, -0.3f, 0f), 0.14f, () =>
                         {
                             target.TakeDamage(CurrentIntent.projectedValue);
                             ConsoleLogUI.Log($"[Enemy] {gameObject.name} lands HEAVY STRIKE on Player for {CurrentIntent.projectedValue} DMG!");
                         }));
 
+                        float hpLost = Mathf.Max(0f, hpBefore - target.CurrentHp);
+
                         if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
                         {
-                            yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(CurrentIntent.projectedValue));
+                            yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(Mathf.RoundToInt(hpLost)));
                         }
                     }
                     break;
@@ -313,8 +354,17 @@ namespace CodeForge.Combat
 
                 case EnemyIntentType.Buff:
                     contactDamage += CurrentIntent.projectedValue;
-                    ConsoleLogUI.Log($"[Enemy] {gameObject.name} powers up! Contact damage increased by {CurrentIntent.projectedValue}.");
+                    ConsoleLogUI.Log($"<color=#FFA94D>[Enemy] {gameObject.name} scales permanently! Contact damage increased by +{CurrentIntent.projectedValue} (Now: {contactDamage:0} DMG).</color>");
                     yield return new WaitForSeconds(0.2f);
+                    break;
+
+                case EnemyIntentType.Debuff:
+                    if (target is PlayerCombatController player)
+                    {
+                        player.DamageMultiplier = Mathf.Max(0.2f, player.DamageMultiplier - 0.2f);
+                        ConsoleLogUI.Log($"<color=#C678DD>[Enemy] {gameObject.name} injected a Syntax Glitch! Player Damage Multiplier reduced by 0.2x (Now: {player.DamageMultiplier:0.0#}x)!</color>");
+                    }
+                    yield return new WaitForSeconds(0.25f);
                     break;
             }
 

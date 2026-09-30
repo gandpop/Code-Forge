@@ -7,6 +7,8 @@ namespace CodeForge.Data
         HighestThreat,
         FirstInLine,
         BossOnly,
-        ChargingEnemy
+        ChargingEnemy,
+        HighestShield,
+        Closest
     }
 }

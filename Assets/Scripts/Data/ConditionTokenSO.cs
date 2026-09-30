@@ -36,6 +36,9 @@ namespace CodeForge.Data
                 ConditionSubject.TargetIntendingAttack =>
                     CompareBools(context.CurrentTarget != null && (context.CurrentTarget.CurrentIntent.intentType == EnemyIntentType.Attack || context.CurrentTarget.CurrentIntent.intentType == EnemyIntentType.HeavyHit), op, comparisonValue > 0.5f),
 
+                ConditionSubject.TargetIsCharging =>
+                    CompareBools(context.CurrentTarget != null && context.CurrentTarget.CurrentIntent.intentType == EnemyIntentType.Charge, op, comparisonValue > 0.5f),
+
                 ConditionSubject.PlayerHealthPercent =>
                     CompareFloats(context.Player != null ? context.Player.HealthPercent : 0f, op, comparisonValue),
 

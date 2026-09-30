@@ -7,6 +7,8 @@ using CodeForge.Data;
 
 namespace CodeForge.UI
 {
+    public enum ShelfSortMode { Standard, Rarity, Type }
+
     [ExecuteAlways]
     public class CodeEditorPanelUI : MonoBehaviour
     {
@@ -74,6 +76,12 @@ namespace CodeForge.UI
         [SerializeField] private Transform tokenInventoryContainer;
         [SerializeField] private GameObject inventoryTokenCardPrefab;
         [SerializeField] private CanvasGroup panelCanvasGroup;
+        [SerializeField] private TextMeshProUGUI shelfHeaderText;
+        [SerializeField] private Button shelfSortButton;
+        [SerializeField] private TextMeshProUGUI shelfSortText;
+        private ShelfSortMode currentSortMode = ShelfSortMode.Standard;
+        private int nextAcquisitionCounter = 0;
+        public ShelfSortMode CurrentSortMode => currentSortMode;
 
         [Header("Starter Loadout")]
         [SerializeField] private List<CodeTokenSO> starterTokens = new List<CodeTokenSO>();
@@ -184,6 +192,8 @@ namespace CodeForge.UI
             FormatAllEditorRows();
             UpdateChanceRowDisplays();
             EnsureScrollPadding();
+            EnsureShelfHeaderLabel();
+            SetupAllMethodFolding();
         }
 
         public void EnsureAllSockets()
@@ -284,7 +294,7 @@ namespace CodeForge.UI
                     if (row != null)
                     {
                         row.gameObject.name = "Line_critMultiplier";
-                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>");
+                        SetRowTexts(row.gameObject, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.1x)</color>");
                     }
                 }
                 else
@@ -292,7 +302,7 @@ namespace CodeForge.UI
                     GameObject rowObj = Instantiate(dmgMultRow.gameObject, contentParent);
                     rowObj.name = "Line_critMultiplier";
                     rowObj.transform.SetSiblingIndex(currentInsertIdx++);
-                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>");
+                    SetRowTexts(rowObj, "    <color=#569CD6>public float</color> <color=#9CDCFE>critMultiplier</color> <color=#D4D4D4>=</color> ", " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.1x)</color>");
 
                     critMultiplierSocket = rowObj.GetComponentInChildren<CodeSocketUI>();
                     if (critMultiplierSocket != null)
@@ -747,7 +757,7 @@ namespace CodeForge.UI
                 var row = critMultiplierSocket.GetComponentInParent<EditorLineRowUI>();
                 if (row != null)
                 {
-                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.5x)</color>";
+                    string postText = " <color=#D4D4D4>;</color> <color=#6A9955>// x (Default: 1.1x)</color>";
                     if (critMultiplierSocket.AssignedToken != null)
                     {
                         postText = $" <color=#D4D4D4>;</color> <color=#6A9955>// x (= {critMultiplierSocket.AssignedToken.floatValue:0.0#}x)</color>";
@@ -835,6 +845,8 @@ namespace CodeForge.UI
             UpdateChanceRowDisplays();
             EnsureScrollPadding();
             EnsureInventoryScrollSensitivity();
+            EnsureShelfSortChip();
+            ApplyInventorySort();
         }
 
         public void EnsureInventoryScrollSensitivity()
@@ -878,9 +890,14 @@ namespace CodeForge.UI
         {
             if (panelCanvasGroup != null)
             {
-                panelCanvasGroup.interactable = !locked;
-                panelCanvasGroup.blocksRaycasts = !locked;
-                panelCanvasGroup.alpha = locked ? 0.85f : 1.0f;
+                panelCanvasGroup.alpha = locked ? 0.95f : 1.0f;
+                panelCanvasGroup.blocksRaycasts = true;
+                panelCanvasGroup.interactable = true;
+            }
+
+            if (compileAndRunButton != null)
+            {
+                compileAndRunButton.interactable = !locked;
             }
         }
 
@@ -962,6 +979,7 @@ namespace CodeForge.UI
             var draggable = cardObj.GetComponent<DraggableTokenCardUI>();
             if (draggable != null)
             {
+                draggable.AcquisitionOrder = ++nextAcquisitionCounter;
                 draggable.BindToken(token);
             }
             else
@@ -977,7 +995,181 @@ namespace CodeForge.UI
             {
                 IntelliSensePopoverUI.Instance.RegisterAvailableTokens(new CodeTokenSO[] { token });
             }
+
+            ApplyInventorySort();
         }
+
+        public void EnsureShelfSortChip()
+        {
+            if (shelfSortButton != null)
+            {
+                shelfSortButton.onClick.RemoveAllListeners();
+                shelfSortButton.onClick.AddListener(CycleShelfSortMode);
+                UpdateShelfSortChipDisplay();
+                return;
+            }
+
+            Transform existing = null;
+            if (shelfHeaderText != null)
+            {
+                existing = shelfHeaderText.transform.Find("ShelfSortChip");
+            }
+            if (existing == null)
+            {
+                existing = transform.Find("ShelfSortChip");
+            }
+
+            GameObject chipObj;
+            if (existing != null)
+            {
+                chipObj = existing.gameObject;
+            }
+            else
+            {
+                chipObj = new GameObject("ShelfSortChip", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button), typeof(Outline));
+                if (shelfHeaderText != null)
+                {
+                    chipObj.transform.SetParent(shelfHeaderText.transform, false);
+                    var rt = chipObj.GetComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(1f, 0.5f);
+                    rt.anchorMax = new Vector2(1f, 0.5f);
+                    rt.pivot = new Vector2(1f, 0.5f);
+                    rt.anchoredPosition = new Vector2(0f, 0f);
+                    rt.sizeDelta = new Vector2(140f, 22f);
+                }
+                else
+                {
+                    chipObj.transform.SetParent(transform, false);
+                    var rt = chipObj.GetComponent<RectTransform>();
+                    rt.anchorMin = new Vector2(0.80f, 0.38f);
+                    rt.anchorMax = new Vector2(0.96f, 0.41f);
+                    rt.sizeDelta = Vector2.zero;
+                }
+
+                var img = chipObj.GetComponent<Image>();
+                img.color = new Color(0.16f, 0.18f, 0.23f, 0.95f);
+
+                var outline = chipObj.GetComponent<Outline>();
+                outline.effectColor = new Color(0.35f, 0.40f, 0.50f, 0.8f);
+                outline.effectDistance = new Vector2(1, -1);
+
+                var txtObj = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                txtObj.transform.SetParent(chipObj.transform, false);
+                var trt = txtObj.GetComponent<RectTransform>();
+                trt.anchorMin = Vector2.zero;
+                trt.anchorMax = Vector2.one;
+                trt.sizeDelta = Vector2.zero;
+
+                shelfSortText = txtObj.GetComponent<TextMeshProUGUI>();
+                shelfSortText.alignment = TextAlignmentOptions.Center;
+                shelfSortText.fontSize = 11f;
+                shelfSortText.fontStyle = FontStyles.Bold;
+                shelfSortText.color = new Color(0.38f, 0.69f, 0.94f, 1f); // #61AFEF
+                shelfSortText.raycastTarget = false;
+                shelfSortText.text = "[Sort: Standard]";
+            }
+
+            shelfSortButton = chipObj.GetComponent<Button>();
+            if (shelfSortText == null) shelfSortText = chipObj.GetComponentInChildren<TextMeshProUGUI>(true);
+
+            shelfSortButton.onClick.RemoveAllListeners();
+            shelfSortButton.onClick.AddListener(CycleShelfSortMode);
+            UpdateShelfSortChipDisplay();
+        }
+
+        public void CycleShelfSortMode()
+        {
+            currentSortMode = (ShelfSortMode)(((int)currentSortMode + 1) % 3);
+            UpdateShelfSortChipDisplay();
+            ApplyInventorySort();
+            ConsoleLogUI.Log($"[Shelf] Inventory sorted by: <b><color=#61AFEF>{currentSortMode}</color></b>");
+        }
+
+        public void UpdateShelfSortChipDisplay()
+        {
+            if (shelfSortText != null)
+            {
+                shelfSortText.text = $"[Sort: {currentSortMode}]";
+            }
+        }
+
+        public void ApplyInventorySort()
+        {
+            if (tokenInventoryContainer == null) return;
+
+            var cards = new List<DraggableTokenCardUI>();
+            for (int i = 0; i < tokenInventoryContainer.childCount; i++)
+            {
+                var card = tokenInventoryContainer.GetChild(i).GetComponent<DraggableTokenCardUI>();
+                if (card != null)
+                {
+                    if (card.AcquisitionOrder == 0) card.AcquisitionOrder = ++nextAcquisitionCounter;
+                    cards.Add(card);
+                }
+            }
+
+            switch (currentSortMode)
+            {
+                case ShelfSortMode.Standard:
+                    cards.Sort((a, b) => a.AcquisitionOrder.CompareTo(b.AcquisitionOrder));
+                    break;
+
+                case ShelfSortMode.Rarity:
+                    // Legendary (Gold) -> Epic (Purple) -> Rare (Blue) -> Uncommon (Green) -> Common (Gray)
+                    cards.Sort((a, b) =>
+                    {
+                        int rA = GetRaritySortWeight(a.Token?.rarity ?? TokenRarity.Common);
+                        int rB = GetRaritySortWeight(b.Token?.rarity ?? TokenRarity.Common);
+                        if (rA != rB) return rA.CompareTo(rB);
+                        int tA = GetTypeSortWeight(a.Token?.tokenType ?? CodeTokenType.Int);
+                        int tB = GetTypeSortWeight(b.Token?.tokenType ?? CodeTokenType.Int);
+                        if (tA != tB) return tA.CompareTo(tB);
+                        return a.AcquisitionOrder.CompareTo(b.AcquisitionOrder);
+                    });
+                    break;
+
+                case ShelfSortMode.Type:
+                    // Int -> Float -> Bool -> Action -> Condition -> Targeting -> Operator
+                    cards.Sort((a, b) =>
+                    {
+                        int tA = GetTypeSortWeight(a.Token?.tokenType ?? CodeTokenType.Int);
+                        int tB = GetTypeSortWeight(b.Token?.tokenType ?? CodeTokenType.Int);
+                        if (tA != tB) return tA.CompareTo(tB);
+                        int rA = GetRaritySortWeight(a.Token?.rarity ?? TokenRarity.Common);
+                        int rB = GetRaritySortWeight(b.Token?.rarity ?? TokenRarity.Common);
+                        if (rA != rB) return rA.CompareTo(rB);
+                        return a.AcquisitionOrder.CompareTo(b.AcquisitionOrder);
+                    });
+                    break;
+            }
+
+            for (int i = 0; i < cards.Count; i++)
+            {
+                cards[i].transform.SetSiblingIndex(i);
+            }
+        }
+
+        private static int GetRaritySortWeight(TokenRarity rarity) => rarity switch
+        {
+            TokenRarity.Legendary => 0,
+            TokenRarity.Epic => 1,
+            TokenRarity.Rare => 2,
+            TokenRarity.Uncommon => 3,
+            TokenRarity.Common => 4,
+            _ => 5
+        };
+
+        private static int GetTypeSortWeight(CodeTokenType type) => type switch
+        {
+            CodeTokenType.Int => 0,
+            CodeTokenType.Float => 1,
+            CodeTokenType.Bool => 2,
+            CodeTokenType.Action => 3,
+            CodeTokenType.Condition => 4,
+            CodeTokenType.Targeting => 5,
+            CodeTokenType.Operator => 6,
+            _ => 7
+        };
 
         public bool RemoveTokenFromInventory(CodeTokenSO token)
         {
@@ -1174,9 +1366,9 @@ namespace CodeForge.UI
         {
             if (critMultiplierSocket != null && critMultiplierSocket.AssignedToken != null)
             {
-                return critMultiplierSocket.AssignedToken.floatValue > 0f ? critMultiplierSocket.AssignedToken.floatValue : 1.5f;
+                return critMultiplierSocket.AssignedToken.floatValue > 0f ? critMultiplierSocket.AssignedToken.floatValue : 1.1f;
             }
-            return 1.5f;
+            return 1.1f;
         }
 
         public int GetEvasionChancePercent()
@@ -1278,7 +1470,7 @@ namespace CodeForge.UI
             {
                 if (req.socket == null || req.socket.AssignedToken == null)
                 {
-                    var row = req.socket != null ? req.socket.GetComponentInParent<EditorLineRowUI>() : null;
+                    var row = req.socket != null ? req.socket.GetComponentInParent<EditorLineRowUI>(true) : null;
                     int lineNum = row != null ? row.lineNumber : 0;
                     string lineLocation = lineNum > 0 ? $"PlayerCombat.cs({lineNum}): error " : "";
                     string onLine = lineNum > 0 ? $" on line {lineNum}" : "";
@@ -1286,6 +1478,7 @@ namespace CodeForge.UI
                     if (req.socket != null)
                     {
                         req.socket.TriggerUnassignedPulsingHighlight();
+                        ScrollToSocket(req.socket);
                     }
                     return false;
                 }
@@ -1296,11 +1489,12 @@ namespace CodeForge.UI
             {
                 if (condition2Socket == null || condition2Socket.AssignedToken == null)
                 {
-                    int lineNum = conditionOpSocket.GetComponentInParent<EditorLineRowUI>()?.lineNumber ?? 38;
+                    int lineNum = conditionOpSocket.GetComponentInParent<EditorLineRowUI>(true)?.lineNumber ?? 38;
                     ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] PlayerCombat.cs({lineNum}): error CS1525: Invalid expression term. Operator '{conditionOpSocket.AssignedToken.GetFormattedCodeString()}' requires a right-hand condition.</color>");
                     if (condition2Socket != null)
                     {
                         condition2Socket.TriggerUnassignedPulsingHighlight();
+                        ScrollToSocket(condition2Socket);
                     }
                     return false;
                 }
@@ -1310,11 +1504,12 @@ namespace CodeForge.UI
             {
                 if (reactionCondition2Socket == null || reactionCondition2Socket.AssignedToken == null)
                 {
-                    int lineNum = reactionConditionOpSocket.GetComponentInParent<EditorLineRowUI>()?.lineNumber ?? 45;
+                    int lineNum = reactionConditionOpSocket.GetComponentInParent<EditorLineRowUI>(true)?.lineNumber ?? 45;
                     ConsoleLogUI.Log($"<color=#FF5454>[Compiler Error] PlayerCombat.cs({lineNum}): error CS1525: Invalid expression term. Operator '{reactionConditionOpSocket.AssignedToken.GetFormattedCodeString()}' requires a right-hand condition.</color>");
                     if (reactionCondition2Socket != null)
                     {
                         reactionCondition2Socket.TriggerUnassignedPulsingHighlight();
+                        ScrollToSocket(reactionCondition2Socket);
                     }
                     return false;
                 }
@@ -1322,6 +1517,8 @@ namespace CodeForge.UI
 
             return true;
         }
+
+        public bool ValidateCode() => ValidatePreBattle();
 
         public StanceTokenSO GetStanceToken()
         {
@@ -1370,7 +1567,19 @@ namespace CodeForge.UI
         private bool EvaluateSingleSocket(CodeSocketUI socket, CombatContext context)
         {
             if (socket == null || socket.AssignedToken == null) return true;
-            if (socket.AssignedToken.tokenType == CodeTokenType.Bool) return socket.AssignedToken.boolValue;
+            if (socket.AssignedToken.tokenType == CodeTokenType.Bool)
+            {
+                if (socket == reactionConditionSocket || socket == reactionCondition2Socket ||
+                    socket.SocketRole == CodeSocketRole.ReactionCondition || socket.SocketRole == CodeSocketRole.ReactionCondition2)
+                {
+                    bool tookHealthDamage = context != null && context.IncomingDamage > 0;
+                    bool result = tookHealthDamage == socket.AssignedToken.boolValue;
+                    string dmgDesc = tookHealthDamage ? $"{context.IncomingDamage} HP lost" : "0 HP lost (shield absorbed hit)";
+                    ConsoleLogUI.Log($"[Reaction] Condition evaluated: Slotted '{socket.AssignedToken.boolValue.ToString().ToLower()}', actual: {dmgDesc} -> Result: <b>{(result ? "<color=#98C379>TRUE (THEN)</color>" : "<color=#E06C75>FALSE (ELSE)</color>")}</b>");
+                    return result;
+                }
+                return socket.AssignedToken.boolValue;
+            }
             if (socket.AssignedToken is ConditionTokenSO cond) return cond.Evaluate(context);
             return true;
         }
@@ -1461,6 +1670,163 @@ namespace CodeForge.UI
             }
         }
 
+        public void EnsureShelfHeaderLabel()
+        {
+            if (shelfHeaderText == null)
+            {
+                var shelfTr = transform.Find("ShelfHeader");
+                if (shelfTr != null) shelfHeaderText = shelfTr.GetComponent<TextMeshProUGUI>();
+            }
+            if (shelfHeaderText != null)
+            {
+                shelfHeaderText.text = "// Token Inventory Shelf (Click to inspect • Drag to socket)";
+            }
+        }
+
+        public void ScrollToSocket(CodeSocketUI socket)
+        {
+            if (socket == null) return;
+            var row = socket.GetComponentInParent<EditorLineRowUI>(true);
+            if (row == null) return;
+            ScrollToRow(row);
+        }
+
+        public void ScrollToRow(EditorLineRowUI row)
+        {
+            if (row == null) return;
+
+            // If row is inside a collapsed method, unfold its parent method first!
+            EnsureRowVisible(row);
+
+            var scrolls = GetComponentsInChildren<ScrollRect>(true);
+            ScrollRect editorScroll = null;
+            foreach (var s in scrolls)
+            {
+                if (s != null && s.name.Contains("Editor")) { editorScroll = s; break; }
+            }
+            if (editorScroll == null || editorScroll.content == null || editorScroll.viewport == null) return;
+
+            var content = editorScroll.content;
+            var viewport = editorScroll.viewport;
+
+            Canvas.ForceUpdateCanvases();
+            LayoutRebuilder.ForceRebuildLayoutImmediate(content);
+
+            float scrollableHeight = content.rect.height - viewport.rect.height;
+            if (scrollableHeight <= 0f) return;
+
+            Vector3 localPos = content.InverseTransformPoint(row.transform.position);
+            float distFromTop = -localPos.y;
+            float targetScrollOffset = distFromTop - (viewport.rect.height / 2f);
+            float clampedOffset = Mathf.Clamp(targetScrollOffset, 0f, scrollableHeight);
+            float normPos = 1f - (clampedOffset / scrollableHeight);
+
+            editorScroll.verticalNormalizedPosition = Mathf.Clamp01(normPos);
+        }
+
+        public void EnsureRowVisible(EditorLineRowUI targetRow)
+        {
+            if (targetRow == null) return;
+            var scrolls = GetComponentsInChildren<ScrollRect>(true);
+            ScrollRect editorScroll = null;
+            foreach (var s in scrolls)
+            {
+                if (s != null && s.name.Contains("Editor")) { editorScroll = s; break; }
+            }
+            if (editorScroll == null || editorScroll.content == null) return;
+
+            var allRows = editorScroll.content.GetComponentsInChildren<EditorLineRowUI>(true);
+            foreach (var r in allRows)
+            {
+                if (r != null && r.ChildRows != null && r.ChildRows.Contains(targetRow))
+                {
+                    if (r.isFolded)
+                    {
+                        r.SetFolded(false);
+                    }
+                }
+            }
+        }
+
+        public void SetupAllMethodFolding()
+        {
+            var scrolls = GetComponentsInChildren<ScrollRect>(true);
+            ScrollRect editorScroll = null;
+            foreach (var s in scrolls)
+            {
+                if (s != null && s.name.Contains("Editor")) { editorScroll = s; break; }
+            }
+            if (editorScroll == null || editorScroll.content == null) return;
+
+            var content = editorScroll.content;
+            var rows = content.GetComponentsInChildren<EditorLineRowUI>(true);
+            if (rows == null || rows.Length == 0) return;
+
+            for (int i = 0; i < rows.Length; i++)
+            {
+                var row = rows[i];
+                string rowText = GetRowFullText(row);
+
+                if (IsMajorMethodHeader(rowText))
+                {
+                    var childList = new List<EditorLineRowUI>();
+                    int braceDepth = 0;
+                    bool startedBraces = false;
+
+                    for (int j = i + 1; j < rows.Length; j++)
+                    {
+                        var childRow = rows[j];
+                        string cText = GetRowFullText(childRow);
+                        string cleanChild = System.Text.RegularExpressions.Regex.Replace(cText, "<.*?>", string.Empty);
+
+                        childList.Add(childRow);
+
+                        if (cleanChild.Contains("{"))
+                        {
+                            braceDepth++;
+                            startedBraces = true;
+                        }
+                        if (cleanChild.Contains("}"))
+                        {
+                            braceDepth--;
+                        }
+
+                        if (startedBraces && braceDepth <= 0)
+                        {
+                            break;
+                        }
+                    }
+
+                    row.SetupFoldToggle(childList);
+                }
+            }
+        }
+
+        private bool IsMajorMethodHeader(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return false;
+            string clean = System.Text.RegularExpressions.Regex.Replace(text, "<.*?>", string.Empty);
+            return clean.Contains("void Attack") ||
+                   clean.Contains("void Defend") ||
+                   clean.Contains("void ExecuteTurn") ||
+                   clean.Contains("void OnTakeDamage");
+        }
+
+        private string GetRowFullText(EditorLineRowUI row)
+        {
+            if (row == null) return "";
+            var tmps = row.GetComponentsInChildren<TextMeshProUGUI>(true);
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            foreach (var t in tmps)
+            {
+                if (t.name != "LineNumber" && t != row.FoldToggleText)
+                {
+                    sb.Append(t.text).Append(" ");
+                }
+            }
+            return sb.ToString();
+        }
+
 #if UNITY_EDITOR
         [ContextMenu("Bake All Rows To Scene")]
         public void BakeAllRowsToScene()
@@ -1489,6 +1855,8 @@ namespace CodeForge.UI
             FormatAllEditorRows();
             EnsureScrollPadding();
             EnsureInventoryScrollSensitivity();
+            EnsureShelfHeaderLabel();
+            SetupAllMethodFolding();
 
             UnityEditor.EditorUtility.SetDirty(this);
             UnityEditor.EditorUtility.SetDirty(gameObject);
