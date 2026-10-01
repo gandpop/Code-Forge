@@ -64,12 +64,19 @@ namespace CodeForge.Data
 
                     case TargetPriority.Closest:
                     case TargetPriority.FirstInLine:
-                        float playerX = player != null ? player.transform.position.x : -2.0f;
-                        float enemyDist = Mathf.Abs(enemy.transform.position.x - playerX);
-                        float candidateDist = Mathf.Abs(candidate.transform.position.x - playerX);
-                        if (enemyDist < candidateDist)
+                        if (enemy.slotIndex < candidate.slotIndex)
                         {
                             candidate = enemy;
+                        }
+                        else if (enemy.slotIndex == candidate.slotIndex)
+                        {
+                            float playerX = player != null ? player.transform.position.x : -3.2f;
+                            float enemyDist = Mathf.Abs(enemy.transform.position.x - playerX);
+                            float candidateDist = Mathf.Abs(candidate.transform.position.x - playerX);
+                            if (enemyDist < candidateDist)
+                            {
+                                candidate = enemy;
+                            }
                         }
                         break;
 

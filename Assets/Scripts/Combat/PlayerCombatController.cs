@@ -306,7 +306,20 @@ namespace CodeForge.Combat
                 editorUI.HighlightSocketRow(editorUI.ReactionConditionSocketUI, true);
                 editorUI.HighlightLine(45, true);
             }
-            bool evalResult = editorUI != null ? editorUI.EvaluateReactionCondition(context) : (reactionCond != null ? reactionCond.Evaluate(context) : true);
+            bool evalResult = true;
+            if (editorUI != null)
+            {
+                evalResult = editorUI.EvaluateReactionCondition(context);
+            }
+            else if (reactionCond is ConditionTokenSO condToken)
+            {
+                evalResult = condToken.Evaluate(context);
+            }
+            else if (reactionCond != null && reactionCond.tokenType == CodeTokenType.Bool)
+            {
+                bool tookHealthDamage = context != null && context.IncomingDamage > 0;
+                evalResult = tookHealthDamage == reactionCond.boolValue;
+            }
             string condSyntax = editorUI != null ? editorUI.GetReactionConditionSyntax() : (reactionCond != null ? reactionCond.GetFormattedCodeString() : "true");
 
             if (editorUI.ReactionConditionSocketUI != null)
@@ -337,10 +350,13 @@ namespace CodeForge.Combat
                 if (editorUI.ReactionActionSocketUI != null) editorUI.ReactionActionSocketUI.SetHighlight(Color.gray, false, 0.3f);
             }
 
+            string dmgDesc = incomingDamage > 0 ? $"{incomingDamage} HP lost" : "0 HP lost (shield absorbed all damage)";
+            string evalBadge = evalResult ? "<color=#98C379>TRUE</color>" : "<color=#E06C75>FALSE</color>";
+
             if (chosenAction != null)
             {
                 string actionStr = chosenAction.GetFormattedCodeString();
-                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): '{condSyntax}' is {evalResult.ToString().ToUpper()} -> Executing {branchName} branch '{actionStr}'.");
+                ConsoleLogUI.Log($"[Event] OnTakeDamage: {dmgDesc} -> Condition '{condSyntax}' evaluated to <b>{evalBadge}</b> -> Executing {branchName} branch '{actionStr}'.");
 
                 if (editorUI != null)
                 {
@@ -375,7 +391,7 @@ namespace CodeForge.Combat
             }
             else
             {
-                ConsoleLogUI.Log($"[Event] OnTakeDamage({incomingDamage}): '{condSyntax}' is {evalResult.ToString().ToUpper()} -> No action slotted in {branchName} branch; skipped.");
+                ConsoleLogUI.Log($"[Event] OnTakeDamage: {dmgDesc} -> Condition '{condSyntax}' evaluated to <b>{evalBadge}</b> -> No action slotted in {branchName} branch; skipped.");
                 yield return new WaitForSeconds(0.15f);
             }
 

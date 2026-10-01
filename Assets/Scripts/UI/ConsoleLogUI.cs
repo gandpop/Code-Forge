@@ -54,12 +54,29 @@ namespace CodeForge.UI
                         currentLineCount = initial.Split('\n').Length;
                     }
                 }
+
+                if (logScrollRect != null)
+                {
+                    logScrollRect.verticalNormalizedPosition = (currentLineCount <= 6) ? 1f : 0f;
+                }
+            }
+        }
+
+        private void Start()
+        {
+            if (logScrollRect != null)
+            {
+                logScrollRect.verticalNormalizedPosition = (currentLineCount <= 6) ? 1f : 0f;
             }
         }
 
         private void OnEnable()
         {
             SetupConsoleHierarchy();
+            if (logScrollRect != null)
+            {
+                logScrollRect.verticalNormalizedPosition = (currentLineCount <= 6) ? 1f : 0f;
+            }
         }
 
         public void SetupConsoleHierarchy()
@@ -129,7 +146,7 @@ namespace CodeForge.UI
             viewportRt.anchorMax = new Vector2(0.98f, 1f);
             viewportRt.pivot = new Vector2(0.5f, 1f);
             viewportRt.offsetMin = new Vector2(0f, 10f);
-            viewportRt.offsetMax = new Vector2(0f, -35f);
+            viewportRt.offsetMax = new Vector2(0f, -38f);
 
             if (logScrollRect != null)
             {
@@ -159,8 +176,10 @@ namespace CodeForge.UI
                 rt.pivot = new Vector2(0.5f, 1f);
                 rt.anchorMin = new Vector2(0f, 1f);
                 rt.anchorMax = new Vector2(1f, 1f);
-                rt.anchoredPosition = Vector2.zero;
+                rt.anchoredPosition = new Vector2(0f, -4f);
                 rt.sizeDelta = Vector2.zero;
+
+                logTextDisplay.margin = new Vector4(6f, 8f, 6f, 6f);
 
                 var csf = logTextDisplay.GetComponent<ContentSizeFitter>();
                 if (csf == null) csf = logTextDisplay.gameObject.AddComponent<ContentSizeFitter>();
@@ -217,7 +236,12 @@ namespace CodeForge.UI
 
             if (logScrollRect != null)
             {
-                if (gameObject.activeInHierarchy && Application.isPlaying)
+                if (currentLineCount <= 6)
+                {
+                    if (scrollCoroutine != null) StopCoroutine(scrollCoroutine);
+                    logScrollRect.verticalNormalizedPosition = 1f;
+                }
+                else if (gameObject.activeInHierarchy && Application.isPlaying)
                 {
                     if (scrollCoroutine != null) StopCoroutine(scrollCoroutine);
                     scrollCoroutine = StartCoroutine(ScrollToBottomCoroutine());
@@ -234,7 +258,7 @@ namespace CodeForge.UI
             logHistory.Clear();
             currentLineCount = 0;
             if (logTextDisplay != null) logTextDisplay.text = "";
-            if (logScrollRect != null) logScrollRect.verticalNormalizedPosition = 0f;
+            if (logScrollRect != null) logScrollRect.verticalNormalizedPosition = 1f;
         }
 
         public void SetText(string text)
@@ -251,7 +275,7 @@ namespace CodeForge.UI
                 currentLineCount = 0;
             }
             if (logTextDisplay != null) logTextDisplay.text = logHistory.ToString();
-            if (logScrollRect != null) logScrollRect.verticalNormalizedPosition = 0f;
+            if (logScrollRect != null) logScrollRect.verticalNormalizedPosition = (currentLineCount <= 6) ? 1f : 0f;
         }
 
 #if UNITY_EDITOR
@@ -273,7 +297,7 @@ namespace CodeForge.UI
             Canvas.ForceUpdateCanvases();
             if (logScrollRect != null)
             {
-                logScrollRect.verticalNormalizedPosition = 0f;
+                logScrollRect.verticalNormalizedPosition = (currentLineCount <= 6) ? 1f : 0f;
             }
             scrollCoroutine = null;
         }

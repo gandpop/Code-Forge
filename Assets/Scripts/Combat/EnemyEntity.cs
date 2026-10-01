@@ -55,6 +55,7 @@ namespace CodeForge.Combat
     {
         [Header("Enemy Attributes")]
         public EnemyArchetype archetype = EnemyArchetype.Default;
+        public int slotIndex = 1;
         public float contactDamage = 10f;
         private CombatEntity playerTarget;
 
@@ -301,7 +302,7 @@ namespace CodeForge.Combat
                     if (target != null && !target.IsDead)
                     {
                         float hpBefore = target.CurrentHp;
-                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.4f, -0.2f, 0f), 0.10f, () =>
+                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.5f, -0.3f, 0f), 0.10f, () =>
                         {
                             target.TakeDamage(CurrentIntent.projectedValue);
                             ConsoleLogUI.Log($"[Enemy] {gameObject.name} attacks Player for {CurrentIntent.projectedValue} DMG!");
@@ -326,7 +327,7 @@ namespace CodeForge.Combat
                     if (target != null && !target.IsDead)
                     {
                         float hpBefore = target.CurrentHp;
-                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.6f, -0.3f, 0f), 0.14f, () =>
+                        yield return StartCoroutine(PerformAttackLunge(new Vector3(-0.5f, -0.3f, 0f), 0.14f, () =>
                         {
                             target.TakeDamage(CurrentIntent.projectedValue);
                             ConsoleLogUI.Log($"[Enemy] {gameObject.name} lands HEAVY STRIKE on Player for {CurrentIntent.projectedValue} DMG!");

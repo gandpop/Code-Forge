@@ -31,6 +31,10 @@ namespace CodeForge.Combat
         private int currentRoomIndex = 1;
         private Coroutine combatCoroutine;
 
+        private Vector3 playerInitialPos;
+        private Vector3 playerInitialScale;
+        private bool playerInitialCaptured = false;
+
         public event Action<GamePhase> OnPhaseChanged;
 
         private void Awake()
@@ -39,6 +43,18 @@ namespace CodeForge.Combat
             else Destroy(gameObject);
 
             Application.runInBackground = true;
+
+            if (player == null)
+            {
+                player = FindFirstObjectByType<PlayerCombatController>();
+            }
+
+            if (player != null)
+            {
+                playerInitialPos = new Vector3(player.transform.position.x, player.transform.position.y, 0f);
+                playerInitialScale = player.transform.localScale;
+                playerInitialCaptured = true;
+            }
 
             if (rewardPanelUI == null)
             {
@@ -91,8 +107,8 @@ namespace CodeForge.Combat
                 3 => "Room 3: 'The Reaction Test' (OnTakeDamage Callback)",
                 4 => "Room 4: 'Double Threat' (Slime Tank & Glass Cannon)",
                 5 => "Room 5: 'Syntax Error' (Syntax Glitch & Shield Beetle Elite)",
-                6 => "Room 6: 'Swarm Routine' (Slime Tank & Glitch Minions)",
-                7 => "Room 7: 'Memory Corruption' (Memory Leak & Golem Elite)",
+                6 => "Room 6: 'Swarm Routine' (Glitch Minion, Shield Beetle & Slime Boss)",
+                7 => "Room 7: 'Memory Corruption' (Syntax Glitch, Memory Leak & Golem Elite)",
                 8 => "Room 8: 'The Core Golem' (Golem Boss & Shield Beetles)",
                 _ => $"Room {currentRoomIndex}: Scaling Dungeon"
             };
@@ -276,71 +292,32 @@ namespace CodeForge.Combat
             if (enemyPrefab == null) return;
 
             int enemyCount = 1;
-            if (room == 4 || room == 5 || room == 7) enemyCount = 2;
-            else if (room == 6 || room == 8) enemyCount = 3;
-            else if (room >= 9)
-            {
-                int cycle = (room - 9) % 3;
-                enemyCount = (cycle == 0) ? 2 : 3;
-            }
+            if (room <= 3) enemyCount = 1;
+            else if (room <= 5) enemyCount = 2;
+            else enemyCount = 3;
 
             var platforms = GameObject.Find("ArenaPlatforms");
             if (platforms != null)
             {
                 var playerPed = platforms.transform.Find("Pedestal_Player");
-                if (playerPed != null) playerPed.position = new Vector3(-2.0f, 0.4f, 0f);
+                if (playerPed != null)
+                {
+                    playerPed.gameObject.SetActive(true);
+                }
 
-                var single = platforms.transform.Find("Pedestal_Enemy_Single");
-                var left = platforms.transform.Find("Pedestal_Enemy_Left");
-                var right = platforms.transform.Find("Pedestal_Enemy_Right");
+                var ped1 = platforms.transform.Find("Pedestal_Enemy_1") ?? platforms.transform.Find("Pedestal_Enemy_Single");
+                var ped2 = platforms.transform.Find("Pedestal_Enemy_2") ?? platforms.transform.Find("Pedestal_Enemy_Left");
+                var ped3 = platforms.transform.Find("Pedestal_Enemy_3") ?? platforms.transform.Find("Pedestal_Enemy_Right");
 
-                if (enemyCount == 1)
-                {
-                    if (single != null)
-                    {
-                        single.position = new Vector3(2.5f, 0.4f, 0f);
-                        single.gameObject.SetActive(true);
-                    }
-                    if (left != null) left.gameObject.SetActive(false);
-                    if (right != null) right.gameObject.SetActive(false);
-                }
-                else if (enemyCount == 2)
-                {
-                    if (single != null) single.gameObject.SetActive(false);
-                    if (left != null)
-                    {
-                        left.position = new Vector3(1.6f, 0.4f, 0f);
-                        left.gameObject.SetActive(true);
-                    }
-                    if (right != null)
-                    {
-                        right.position = new Vector3(3.4f, 0.4f, 0f);
-                        right.gameObject.SetActive(true);
-                    }
-                }
-                else // 3 enemies
-                {
-                    if (single != null)
-                    {
-                        single.position = new Vector3(2.5f, 0.4f, 0f);
-                        single.gameObject.SetActive(true);
-                    }
-                    if (left != null)
-                    {
-                        left.position = new Vector3(1.4f, 0.4f, 0f);
-                        left.gameObject.SetActive(true);
-                    }
-                    if (right != null)
-                    {
-                        right.position = new Vector3(3.6f, 0.4f, 0f);
-                        right.gameObject.SetActive(true);
-                    }
-                }
+                if (ped1 != null) ped1.gameObject.SetActive(enemyCount >= 1);
+                if (ped2 != null) ped2.gameObject.SetActive(enemyCount >= 2);
+                if (ped3 != null) ped3.gameObject.SetActive(enemyCount >= 3);
             }
 
-            if (player != null)
+            if (player != null && playerInitialCaptured)
             {
-                player.transform.position = new Vector3(-2.0f, 1.0f, 0f);
+                player.transform.position = playerInitialPos;
+                player.transform.localScale = playerInitialScale;
             }
 
             // Curated encounter table & dynamic scaling
@@ -348,94 +325,136 @@ namespace CodeForge.Combat
             {
                 case 1:
                     // Room 1: 1x Training Slime (15 HP, 3 DMG)
-                    SpawnEnemy("Training_Slime", new Vector3(2.5f, 1.1f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
+                    SpawnEnemy("Training_Slime", 1, 15f, 3f, EnemyArchetype.TrainingSlime);
                     break;
 
                 case 2:
                     // Room 2: 1x Shield Beetle (30 HP, 6 DMG / 12 Shield)
-                    SpawnEnemy("Shield_Beetle", new Vector3(2.5f, 1.1f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Shield_Beetle", 1, 30f, 6f, EnemyArchetype.ShieldBeetle);
                     break;
 
                 case 3:
                     // Room 3: 1x Golem Charger (45 HP, 18 DMG Heavy)
-                    SpawnEnemy("Golem_Charger", new Vector3(2.5f, 1.1f, 0f), 45f, 18f, EnemyArchetype.GolemCharger);
+                    SpawnEnemy("Golem_Charger", 1, 45f, 18f, EnemyArchetype.GolemCharger);
                     break;
 
                 case 4:
-                    // Room 4: 2 Enemies — Slime Tank (30 HP, 4 DMG) + Glass Cannon (20 HP, 9 DMG)
-                    SpawnEnemy("Slime_Tank", new Vector3(1.6f, 1.1f, 0f), 30f, 4f, EnemyArchetype.SlimeTank);
-                    SpawnEnemy("Glass_Cannon", new Vector3(3.4f, 1.1f, 0f), 20f, 9f, EnemyArchetype.GlassCannon);
+                    // Room 4: 2 Enemies — Slime Tank (Frontline) + Glass Cannon (Midline)
+                    SpawnEnemy("Slime_Tank", 1, 30f, 4f, EnemyArchetype.SlimeTank);
+                    SpawnEnemy("Glass_Cannon", 2, 20f, 9f, EnemyArchetype.GlassCannon);
                     break;
 
                 case 5:
-                    // Room 5: 2 Enemies — Syntax Glitch (28 HP, 8 DMG) + Shield Beetle Elite (35 HP, 7 DMG)
-                    SpawnEnemy("Syntax_Glitch", new Vector3(1.6f, 1.1f, 0f), 28f, 8f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Shield_Beetle_Elite", new Vector3(3.4f, 1.1f, 0f), 35f, 7f, EnemyArchetype.ShieldBeetle);
+                    // Room 5: 2 Enemies — Syntax Glitch (Frontline) + Shield Beetle Elite (Midline)
+                    SpawnEnemy("Syntax_Glitch", 1, 28f, 8f, EnemyArchetype.SyntaxGlitch);
+                    SpawnEnemy("Shield_Beetle_Elite", 2, 35f, 7f, EnemyArchetype.ShieldBeetle);
                     break;
 
                 case 6:
-                    // Room 6: 3 Enemies — 1x Slime Tank (32 HP) flanked by 2x Glitch Minions (16 HP, 3 DMG each)
-                    SpawnEnemy("Glitch_Minion_Left", new Vector3(1.4f, 1.1f, 0f), 16f, 3f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Slime_Tank", new Vector3(2.5f, 1.1f, 0f), 32f, 4f, EnemyArchetype.SlimeTank);
-                    SpawnEnemy("Glitch_Minion_Right", new Vector3(3.6f, 1.1f, 0f), 16f, 3f, EnemyArchetype.SyntaxGlitch);
+                    // Room 6: 3 Enemies — Glitch Minion (Frontline) + Shield Beetle (Midline) + Slime Tank Boss (Backline)
+                    SpawnEnemy("Glitch_Minion", 1, 16f, 3f, EnemyArchetype.SyntaxGlitch);
+                    SpawnEnemy("Shield_Beetle", 2, 25f, 5f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Slime_Tank_Boss", 3, 40f, 6f, EnemyArchetype.SlimeTank);
                     break;
 
                 case 7:
-                    // Room 7: 2 Enemies — Memory Leak (35 HP, 6 DMG) + Golem Elite (50 HP, 16 DMG)
-                    SpawnEnemy("Memory_Leak", new Vector3(1.6f, 1.1f, 0f), 35f, 6f, EnemyArchetype.MemoryLeak);
-                    SpawnEnemy("Golem_Elite", new Vector3(3.4f, 1.1f, 0f), 50f, 16f, EnemyArchetype.GolemCharger);
+                    // Room 7: 3 Enemies — Syntax Glitch (Frontline) + Memory Leak (Midline) + Golem Elite (Backline)
+                    SpawnEnemy("Syntax_Glitch", 1, 24f, 6f, EnemyArchetype.SyntaxGlitch);
+                    SpawnEnemy("Memory_Leak", 2, 35f, 6f, EnemyArchetype.MemoryLeak);
+                    SpawnEnemy("Golem_Elite", 3, 50f, 16f, EnemyArchetype.GolemCharger);
                     break;
 
                 case 8:
-                    // Room 8: 3 Enemies — 1x Golem Boss (65 HP, 16 DMG) flanked by 2x Shield Beetles (30 HP, 5 DMG)
-                    SpawnEnemy("Shield_Beetle_Left", new Vector3(1.4f, 1.1f, 0f), 30f, 5f, EnemyArchetype.ShieldBeetle);
-                    SpawnEnemy("Golem_Boss", new Vector3(2.5f, 1.1f, 0f), 65f, 16f, EnemyArchetype.GolemCharger);
-                    SpawnEnemy("Shield_Beetle_Right", new Vector3(3.6f, 1.1f, 0f), 30f, 5f, EnemyArchetype.ShieldBeetle);
+                    // Room 8: 3 Enemies — Shield Beetle (Frontline) + Shield Beetle (Midline) + Golem Boss (Backline)
+                    SpawnEnemy("Shield_Beetle_Front", 1, 30f, 5f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Shield_Beetle_Mid", 2, 30f, 5f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Golem_Boss", 3, 65f, 16f, EnemyArchetype.GolemCharger);
                     break;
 
                 default:
-                    // Room 9+: Dynamic rotating 2- and 3-enemy compositions with progressive scaling
+                    // Room 9+: Dynamic rotating 3-enemy compositions with progressive scaling
                     float scale = 1f + (room - 8) * 0.12f;
                     int cycle = (room - 9) % 3;
                     if (cycle == 0)
                     {
-                        // 2 Enemies: Memory Leak + Syntax Glitch
-                        SpawnEnemy($"Memory_Leak_R{room}", new Vector3(1.6f, 1.1f, 0f), 36f * scale, 6f * scale, EnemyArchetype.MemoryLeak);
-                        SpawnEnemy($"Syntax_Glitch_R{room}", new Vector3(3.4f, 1.1f, 0f), 30f * scale, 8f * scale, EnemyArchetype.SyntaxGlitch);
+                        SpawnEnemy($"Syntax_Glitch_R{room}", 1, 26f * scale, 6f * scale, EnemyArchetype.SyntaxGlitch);
+                        SpawnEnemy($"Memory_Leak_R{room}", 2, 36f * scale, 6f * scale, EnemyArchetype.MemoryLeak);
+                        SpawnEnemy($"Golem_Charger_R{room}", 3, 50f * scale, 16f * scale, EnemyArchetype.GolemCharger);
                     }
                     else if (cycle == 1)
                     {
-                        // 3 Enemies: Golem flanked by Shield Beetles
-                        SpawnEnemy($"Shield_Beetle_L_R{room}", new Vector3(1.4f, 1.1f, 0f), 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
-                        SpawnEnemy($"Golem_Charger_R{room}", new Vector3(2.5f, 1.1f, 0f), 45f * scale, 16f * scale, EnemyArchetype.GolemCharger);
-                        SpawnEnemy($"Shield_Beetle_R_R{room}", new Vector3(3.6f, 1.1f, 0f), 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
+                        SpawnEnemy($"Shield_Beetle_1_R{room}", 1, 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
+                        SpawnEnemy($"Shield_Beetle_2_R{room}", 2, 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
+                        SpawnEnemy($"Golem_Boss_R{room}", 3, 60f * scale, 18f * scale, EnemyArchetype.GolemCharger);
                     }
                     else
                     {
-                        // 3 Enemies: Slime Tank flanked by Glass Cannons
-                        SpawnEnemy($"Glass_Cannon_L_R{room}", new Vector3(1.4f, 1.1f, 0f), 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
-                        SpawnEnemy($"Slime_Tank_R{room}", new Vector3(2.5f, 1.1f, 0f), 34f * scale, 4f * scale, EnemyArchetype.SlimeTank);
-                        SpawnEnemy($"Glass_Cannon_R_R{room}", new Vector3(3.6f, 1.1f, 0f), 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
+                        SpawnEnemy($"Glass_Cannon_1_R{room}", 1, 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
+                        SpawnEnemy($"Glass_Cannon_2_R{room}", 2, 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
+                        SpawnEnemy($"Slime_Tank_Boss_R{room}", 3, 45f * scale, 6f * scale, EnemyArchetype.SlimeTank);
                     }
                     break;
             }
         }
 
-        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
+        public static Vector3 GetSlotPosition(int slotIndex)
+        {
+            var platforms = GameObject.Find("ArenaPlatforms");
+            if (platforms != null)
+            {
+                string pedName = slotIndex switch
+                {
+                    1 => "Pedestal_Enemy_1",
+                    2 => "Pedestal_Enemy_2",
+                    3 => "Pedestal_Enemy_3",
+                    _ => "Pedestal_Enemy_1"
+                };
+                var ped = platforms.transform.Find(pedName) ??
+                          platforms.transform.Find(slotIndex == 1 ? "Pedestal_Enemy_Single" : (slotIndex == 2 ? "Pedestal_Enemy_Left" : "Pedestal_Enemy_Right"));
+                if (ped != null)
+                {
+                    // Spawn directly on top of the pedestal
+                    return new Vector3(ped.position.x, ped.position.y + 0.70f, 0f);
+                }
+            }
+
+            return slotIndex switch
+            {
+                1 => new Vector3(3.12f, -1.20f, 0f),
+                2 => new Vector3(-2.30f, 0.72f, 0f),
+                3 => new Vector3(2.09f, 1.94f, 0f),
+                _ => new Vector3(3.12f, -1.20f, 0f)
+            };
+        }
+
+        public static Vector3 GetSlotScale(int slotIndex) => new Vector3(1.0f, 1.0f, 1.0f);
+
+        private void SpawnEnemy(string name, int slotIndex, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
         {
             GameObject obj = Instantiate(enemyPrefab, enemySpawnContainer);
             obj.name = name;
-            obj.transform.localPosition = localPos;
+            obj.transform.position = GetSlotPosition(slotIndex);
+            obj.transform.localScale = GetSlotScale(slotIndex);
 
             EnemyEntity enemy = obj.GetComponent<EnemyEntity>();
             if (enemy != null)
             {
+                enemy.slotIndex = slotIndex;
                 enemy.archetype = archetype;
                 enemy.contactDamage = dmg;
                 enemy.Initialize(player);
                 enemy.SetMaxHp(hp);
                 enemy.RollNextIntent(1);
                 activeEnemies.Add(enemy);
+            }
+        }
+
+        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
+        {
+            SpawnEnemy(name, 1, hp, dmg, archetype);
+            if (activeEnemies.Count > 0)
+            {
+                activeEnemies[activeEnemies.Count - 1].transform.position = localPos;
             }
         }
     }

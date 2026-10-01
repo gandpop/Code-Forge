@@ -219,7 +219,7 @@ namespace CodeForge.UI
             if (hpText != null)
             {
                 string shieldBadge = shield > 0 ? $"  <color=#55AAFF><b>(+{shield} SHIELD)</b></color>" : "";
-                hpText.text = $"<size=115%><b>PLAYER</b></size>    <b>{Mathf.CeilToInt(current)} / {Mathf.CeilToInt(max)} HP</b>{shieldBadge}";
+                hpText.text = $"<size=115%><b>PLAYER</b></size>    <b>{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)} HP</b>{shieldBadge}";
             }
         }
 

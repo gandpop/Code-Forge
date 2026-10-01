@@ -1,202 +1,116 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v21.0)
-## Project: CodeForge — Crit Compounding Baseline (1.1x), Gutter/Fold Column Alignment, Enemies.Closest(), Full Rarity Sorting, & Dynamic 1-to-3 Enemy Encounters
+# ARCHITECTURAL PLAN & SPECIFICATION (v23.0)
+## Project: CodeForge — Console Viewport Padding & Health-Gated `OnTakeDamage` Reaction Logic
 
 ---
 
 ## 1. Executive Summary & Design Evaluation
 
-### 1.1 Crit Multiplier Compounding Baseline (1.1x)
-* **The Math Model:** Attack damage follows the strict compounding formula:
-  $$\text{Final Damage} = (\text{baseDamage} \times \text{damageMultiplier}) \times \text{critMultiplier}$$
-* **Why 1.1x Default Fallback:**
-  - With a high baseline (e.g. 1.5x), drafting early float tokens like `Float_1.1`, `Float_1.2`, and `Float_1.25` felt pointless because slotting them lowered the player's crit damage below the default fallback.
-  - Setting the default unslotted fallback to **`1.1x`** guarantees that **every float token in the game ($\ge 1.1f$) is an immediate, palpable upgrade**.
-  - Example: Base damage 10, `damageMultiplier = 1.5f` ($10 \times 1.5 = 15$).
-    - Unslotted baseline: $15 \times 1.1 = 16.5 \approx 17\text{ DMG}$.
-    - Slotting `Float_1.25`: $15 \times 1.25 = 18.75 \approx 19\text{ DMG}$.
-    - Slotting `Float_1.5`: $15 \times 1.5 = 22.5 \approx 23\text{ DMG}$.
-    - Slotting `Float_2.0`: $15 \times 2.0 = 30\text{ DMG}$!
-
-### 1.2 Line-Collapse Gutter Alignment & Left Margin Polish
-* **The Root Cause:**
-  - On foldable lines, `FoldToggleBtn` was placed before `Gutter`, shifting the line number 25px right into the code text.
-  - The fold toggle touched the far left screen edge and got clipped.
-* **The Solution:** Establish a strict, unified column structure across all line rows:
-  $$\text{[Left Margin: 6px]} \longrightarrow \text{[Gutter / Line Number: 28px]} \longrightarrow \text{[Fold Slot: 18px]} \longrightarrow \text{[Code Text]}$$
-  - Line numbers stay vertically aligned in a neat column.
-  - Fold buttons sit cleanly between line numbers and code without pushing text.
-
-### 1.3 Target Selection: `Enemies.Closest()`
-* **Pedagogical Alignment:** Preserves consistent collection-query grammar (`Enemies.LowestHP()`, `Enemies.HighestShield()`, `Enemies.Closest()`).
-* **Implementation:** Calculates horizontal distance: `Mathf.Abs(enemy.transform.position.x - player.transform.position.x)`.
-
-### 1.4 Eliminating Mid-Game Boredom: Rotating 1-, 2-, and 3-Enemy Encounters
-* **The Problem:** After Room 3, the encounter generation defaulted to spawning the exact same two enemies (`Memory_Leak` + `Golem_Elite`) repeatedly forever, leaving 5 other implemented archetypes unused and making combat feel dry and repetitive.
-* **The Solution — Curated & Rotating Encounter Table:**
-  Rotate through all 7 archetypes (`TrainingSlime`, `ShieldBeetle`, `GolemCharger`, `GlassCannon`, `SlimeTank`, `MemoryLeak`, `SyntaxGlitch`) across varied 1-, 2-, and 3-enemy compositions:
-  - **Room 1 (Tutorial):** 1x Training Slime (15 HP, 3 DMG)
-  - **Room 2 (Armor Check):** 1x Shield Beetle (30 HP, 6 DMG / 12 Shield)
-  - **Room 3 (Reaction Check):** 1x Golem Charger (45 HP, 18 DMG Heavy)
-  - **Room 4 (Targeting Puzzle):** 2 Enemies — Slime Tank (Frontline 30 HP, 4 DMG) + Glass Cannon (Backline 20 HP, 9 DMG)
-  - **Room 5 (Disruption Check):** 2 Enemies — Syntax Glitch (28 HP, 8 DMG + Debuff) + Shield Beetle Elite (35 HP, 7 DMG)
-  - **Room 6 (AoE Swarm):** 3 Enemies — 3x Glitch Minions / Slimes (15 HP, 3 DMG each) $\rightarrow$ prime target for cleave/AoE!
-  - **Room 7 (Heavy Dual):** 2 Enemies — Memory Leak (35 HP, 6 DMG lifesteal) + Golem Elite (50 HP, 16 DMG heavy)
-  - **Room 8+ (Boss Encounter):** 3 Enemies — 1x Golem Boss (65 HP, 16 DMG) flanked by 2x Shield Beetles (30 HP, 6 DMG / 10 Shield)
-  - **Infinite Mode (Room 9+):** Rotates through dynamic 2- and 3-enemy compositions with scaling health and damage:
-    $$\text{dmgScale} = 1.0f + (\text{room} - 3) \times 0.15f, \quad \text{hpScale} = 1.0f + (\text{room} - 3) \times 0.20f$$
-
-### 1.5 Token Inventory Shelf Sorting with Full Rarity
-* **Sorting Modes:**
-  - `Standard`: Natural acquisition order.
-  - `Rarity`: `Legendary` (Gold) $\rightarrow$ `Epic` (Purple) $\rightarrow$ `Rare` (Blue) $\rightarrow$ `Uncommon` (Green) $\rightarrow$ `Common` (Gray).
-  - `Type`: `Int` $\rightarrow$ `Float` $\rightarrow$ `Bool` $\rightarrow$ `Action` $\rightarrow$ `Condition` $\rightarrow$ `Targeting` $\rightarrow$ `Operator`.
-* Strictly manual toggle to prevent disorienting card shifting.
+### 1.1 Issue 1: Console Viewport First Line Clipping
+* **The Symptom:** In `ConsoleLogUI`, the very first line of output is consistently cut off at the top.
+* **Root Cause Analysis:**
+  1. `ConsoleViewport` uses `RectMask2D` with `offsetMax = new Vector2(0f, -35f)` and `pivot = (0.5f, 1f)`.
+  2. The text component (`logTextDisplay`) has `rectTransform.anchoredPosition = Vector2.zero` and `margin = Vector4.zero`.
+  3. When content is at the top (`verticalNormalizedPosition == 1f` or when lines are few), the ascenders of the top line of text (font size 15.5) collide with and are masked by the upper boundary of `ConsoleViewport`.
+* **The Solution:**
+  - Increase top padding in `logTextDisplay.margin`: `logTextDisplay.margin = new Vector4(6f, 8f, 6f, 6f);`.
+  - Adjust `ConsoleViewport` `offsetMax` to `new Vector2(0f, -38f)` to ensure a comfortable 8px clearance below `ConsoleHeader` (which sits at $Y = -8$ to $-30$).
+  - Offset `logTextDisplay.rectTransform.anchoredPosition` to `new Vector2(0f, -4f)`.
+  - When line count is small (content height $\le$ viewport height), ensure `ScrollRect` sits at top (`verticalNormalizedPosition = 1f`).
 
 ---
 
-## 2. Technical Specifications & Architecture
-
-### 2.1 Crit Baseline Update (`PlayerCombatController.cs` & `CodeEditorPanelUI.cs`)
-
-* In `PlayerCombatController.cs`:
-  ```csharp
-  public float CritMultiplier { get; set; } = 1.1f;
-  ```
-* In `CodeEditorPanelUI.cs`:
-  ```csharp
-  public float GetCritMultiplier()
-  {
-      if (critMultiplierSocket != null && critMultiplierSocket.AssignedToken != null)
-      {
-          return critMultiplierSocket.AssignedToken.floatValue > 0f ? critMultiplierSocket.AssignedToken.floatValue : 1.1f;
-      }
-      return 1.1f;
-  }
-  ```
-* Update Line 10 comment: `// x (Default: 1.1x)`.
+### 1.2 Issue 2: Health-Gated `OnTakeDamage` (HP vs. Shield Damage Reaction)
+* **The Problem:** 
+  The player's `OnTakeDamage(int incomingDamage)` callback was executing the `THEN` branch unconditionally or even when damage was 100% absorbed by shield.
+* **The Pedagogical Concept (The Boolean Identity Switch):**
+  - In educational programming, `OnTakeDamage` tests a condition: **"Did I lose actual health points?"**
+  - **Shield Absorbs Hit ($0\text{ HP}$ lost):**
+    - The attack did NOT penetrate health $\rightarrow$ `tookHealthDamage = false`.
+    - If `Bool_true` is slotted (default): `(false == true)` $\rightarrow$ **`FALSE`** $\rightarrow$ executes **`ELSE`** branch (e.g. `Attack(target);` — counter-attack!).
+    - If `Bool_false` is slotted: `(false == false)` $\rightarrow$ **`TRUE`** $\rightarrow$ executes **`THEN`** branch!
+  - **Attack Penetrates Shield ($>0\text{ HP}$ lost):**
+    - The attack damaged the player's core health $\rightarrow$ `tookHealthDamage = true`.
+    - If `Bool_true` is slotted: `(true == true)` $\rightarrow$ **`TRUE`** $\rightarrow$ executes **`THEN`** branch (e.g. emergency `Defend();`).
+    - If `Bool_false` is slotted: `(true == false)` $\rightarrow$ **`FALSE`** $\rightarrow$ executes **`ELSE`** branch!
+  - By simply swapping `true` and `false` in `if ( [bool] )`, the student flips the logic between defensive turtle and counter-puncher!
 
 ---
 
-### 2.2 Gutter & Fold Layout (`EditorLineRowUI.cs`)
+## 2. Technical Specifications & File Edits
 
-```csharp
-public void FormatRow()
-{
-    var layout = GetComponent<HorizontalLayoutGroup>();
-    if (layout != null)
-    {
-        layout.spacing = 4f;
-        layout.padding = new RectOffset(6, 6, 0, 0); // 6px left margin
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-    }
-
-    Transform gutterTr = transform.Find("Gutter") ?? transform.Find("LineNumberContainer");
-    if (gutterTr != null)
-    {
-        gutterTr.SetSiblingIndex(1);
-        var le = gutterTr.GetComponent<LayoutElement>() ?? gutterTr.gameObject.AddComponent<LayoutElement>();
-        le.minWidth = 28f;
-        le.preferredWidth = 28f;
-    }
-
-    if (foldToggleButton != null)
-    {
-        foldToggleButton.transform.SetSiblingIndex(2);
-        var le = foldToggleButton.GetComponent<LayoutElement>() ?? foldToggleButton.gameObject.AddComponent<LayoutElement>();
-        le.minWidth = 18f;
-        le.preferredWidth = 18f;
-    }
-}
-```
+### 2.1 `Assets/Scripts/UI/ConsoleLogUI.cs`
+1. In `SetupConsoleHierarchy()`:
+   - Adjust `viewportRt.offsetMax = new Vector2(0f, -38f);`.
+   - Set `logTextDisplay.margin = new Vector4(6f, 8f, 6f, 6f);`.
+   - Set `logTextDisplay.rectTransform.anchoredPosition = new Vector2(0f, -4f);`.
+2. In `AppendMessage()`:
+   - If `currentLineCount <= 6`, clamp scroll position to `1f` (top) rather than forcing bottom, preventing single/double lines from jumping or clipping.
 
 ---
 
-### 2.3 Curated & Rotating Encounter Spawner (`CombatManager.cs`)
+### 2.2 `Assets/Scripts/Combat/PlayerCombatController.cs`
+1. In `HandleIncomingDamageReaction(int incomingDamage, CodeEditorPanelUI editorUI = null, List<EnemyEntity> activeEnemies = null)`:
+   - Ensure the passed `incomingDamage` represents actual health lost (`hpLost`).
+   - Update the console log to clearly explain the evaluation:
+     ```csharp
+     string dmgDesc = incomingDamage > 0 ? $"{incomingDamage} HP lost" : "0 HP lost (shield absorbed all damage)";
+     ConsoleLogUI.Log($"[Event] OnTakeDamage({dmgDesc}): Condition '{condSyntax}' evaluated to <b>{(evalResult ? "<color=#98C379>TRUE</color>" : "<color=#E06C75>FALSE</color>")}</b> -> Executing {branchName} branch '{actionStr}'.");
+     ```
 
-```csharp
-private void SpawnRoomEnemies(int room)
-{
-    if (enemySpawnContainer != null)
+---
+
+### 2.3 `Assets/Scripts/UI/CodeEditorPanelUI.cs`
+1. **Default Pre-slotted Tokens:**
+   - Change `[SerializeField] private ConditionTokenSO defaultReactionCondition;` to `[SerializeField] private CodeTokenSO defaultReactionCondition;`.
+   - Add `[SerializeField] private ActionTokenSO defaultReactionElseAction;`.
+   - In `PrePopulateDefaultTokens()`:
+     ```csharp
+     SlotDefaultIfEmpty(reactionConditionSocket, defaultReactionCondition); // Assigns Bool_true
+     SlotDefaultIfEmpty(reactionActionSocket, defaultReactionAction);       // Assigns Action_Defend
+     SlotDefaultIfEmpty(reactionElseActionSocket, defaultReactionElseAction); // Assigns Action_Attack
+     ```
+2. **Evaluation in `EvaluateSingleSocket()`:**
+   - Handle empty socket fallback: if socket is empty or null, treat slotted value as `true`.
+   - When evaluating `CodeSocketRole.ReactionCondition` or `ReactionCondition2`:
+     ```csharp
+     bool tookHealthDamage = context != null && context.IncomingDamage > 0;
+     bool expectedBool = socket.AssignedToken != null ? socket.AssignedToken.boolValue : true;
+     bool result = (tookHealthDamage == expectedBool);
+     return result;
+     ```
+3. **Starter Tokens:**
+   - Ensure `Bool_false` is included in starter tokens / reward pool so the player can test swapping `if (true)` and `if (false)`.
+
+---
+
+### 2.4 `Assets/Scripts/Combat/EnemyEntity.cs`
+- Verify lines 304–322 and lines 329–341:
+  - Both `Attack` and `HeavyHit` calculate:
+    ```csharp
+    float hpBefore = target.CurrentHp;
+    // ... deal damage ...
+    float hpLost = Mathf.Max(0f, hpBefore - target.CurrentHp);
+    if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
     {
-        foreach (Transform child in enemySpawnContainer) Destroy(child.gameObject);
+        yield return StartCoroutine(playerCombat.HandleIncomingDamageReaction(Mathf.RoundToInt(hpLost)));
     }
-    activeEnemies.Clear();
-
-    float dmgScale = 1.0f + Mathf.Max(0, room - 3) * 0.15f;
-    float hpScale = 1.0f + Mathf.Max(0, room - 3) * 0.20f;
-
-    switch (room)
-    {
-        case 1:
-            SpawnEnemy("Training_Slime", new Vector3(2.5f, 1.1f, 0f), 15f, 3f, EnemyArchetype.TrainingSlime);
-            break;
-        case 2:
-            SpawnEnemy("Shield_Beetle", new Vector3(2.5f, 1.1f, 0f), 30f, 6f, EnemyArchetype.ShieldBeetle);
-            break;
-        case 3:
-            SpawnEnemy("Golem_Charger", new Vector3(2.5f, 1.1f, 0f), 45f, 18f, EnemyArchetype.GolemCharger);
-            break;
-        case 4:
-            // 2 Enemies: Frontline Tank + Backline Glass Cannon
-            SpawnEnemy("Slime_Tank", new Vector3(1.6f, 1.1f, 0f), 30f * hpScale, 4f * dmgScale, EnemyArchetype.SlimeTank);
-            SpawnEnemy("Glass_Cannon", new Vector3(3.4f, 1.1f, 0f), 20f * hpScale, 9f * dmgScale, EnemyArchetype.GlassCannon);
-            break;
-        case 5:
-            // 2 Enemies: Disruptor + Shield Tank
-            SpawnEnemy("Syntax_Glitch", new Vector3(1.6f, 1.1f, 0f), 28f * hpScale, 8f * dmgScale, EnemyArchetype.SyntaxGlitch);
-            SpawnEnemy("Shield_Beetle_Elite", new Vector3(3.4f, 1.1f, 0f), 35f * hpScale, 7f * dmgScale, EnemyArchetype.ShieldBeetle);
-            break;
-        case 6:
-            // 3 Enemies: Swarm Cleave Puzzle
-            SpawnEnemy("Glitch_Bug_A", new Vector3(1.4f, 1.1f, 0f), 16f * hpScale, 3f * dmgScale, EnemyArchetype.Default);
-            SpawnEnemy("Slime_Tank", new Vector3(2.5f, 1.1f, 0f), 32f * hpScale, 4f * dmgScale, EnemyArchetype.SlimeTank);
-            SpawnEnemy("Glitch_Bug_B", new Vector3(3.6f, 1.1f, 0f), 16f * hpScale, 3f * dmgScale, EnemyArchetype.Default);
-            break;
-        case 7:
-            // 2 Enemies: Life Steal + Heavy Charger
-            SpawnEnemy("Memory_Leak", new Vector3(1.6f, 1.1f, 0f), 35f * hpScale, 6f * dmgScale, EnemyArchetype.MemoryLeak);
-            SpawnEnemy("Golem_Elite", new Vector3(3.4f, 1.1f, 0f), 50f * hpScale, 16f * dmgScale, EnemyArchetype.GolemCharger);
-            break;
-        case 8:
-            // 3 Enemies: Boss Encounter (Golem Boss flanked by 2 Shield Beetles)
-            SpawnEnemy("Shield_Beetle_L", new Vector3(1.3f, 1.1f, 0f), 30f * hpScale, 5f * dmgScale, EnemyArchetype.ShieldBeetle);
-            SpawnEnemy("Golem_Boss", new Vector3(2.5f, 1.2f, 0f), 65f * hpScale, 16f * dmgScale, EnemyArchetype.GolemCharger);
-            SpawnEnemy("Shield_Beetle_R", new Vector3(3.7f, 1.1f, 0f), 30f * hpScale, 5f * dmgScale, EnemyArchetype.ShieldBeetle);
-            break;
-        default:
-            // Endless Mode (Rotating Compositions)
-            int cycle = (room - 9) % 3;
-            if (cycle == 0)
-            {
-                SpawnEnemy($"Slime_Tank_R{room}", new Vector3(1.6f, 1.1f, 0f), 35f * hpScale, 5f * dmgScale, EnemyArchetype.SlimeTank);
-                SpawnEnemy($"Glass_Cannon_R{room}", new Vector3(3.4f, 1.1f, 0f), 25f * hpScale, 11f * dmgScale, EnemyArchetype.GlassCannon);
-            }
-            else if (cycle == 1)
-            {
-                SpawnEnemy($"Memory_Leak_R{room}", new Vector3(1.6f, 1.1f, 0f), 40f * hpScale, 7f * dmgScale, EnemyArchetype.MemoryLeak);
-                SpawnEnemy($"Syntax_Glitch_R{room}", new Vector3(3.4f, 1.1f, 0f), 32f * hpScale, 9f * dmgScale, EnemyArchetype.SyntaxGlitch);
-            }
-            else
-            {
-                SpawnEnemy($"Bug_L_R{room}", new Vector3(1.3f, 1.1f, 0f), 20f * hpScale, 4f * dmgScale, EnemyArchetype.Default);
-                SpawnEnemy($"Golem_R{room}", new Vector3(2.5f, 1.2f, 0f), 60f * hpScale, 18f * dmgScale, EnemyArchetype.GolemCharger);
-                SpawnEnemy($"Bug_R_R{room}", new Vector3(3.7f, 1.1f, 0f), 20f * hpScale, 4f * dmgScale, EnemyArchetype.Default);
-            }
-            break;
-    }
-}
-```
+    ```
 
 ---
 
 ## 3. Verification & Acceptance Checklist
 
-- [ ] **Crit Multiplier Baseline (1.1x):** Without a slotted token, `critMultiplier` defaults to `1.1f`. Attack formula is verified as `(baseDamage * damageMultiplier) * critMultiplier`. Any drafted float ($\ge 1.1f$) provides an immediate upgrade over leaving the socket empty.
-- [ ] **Gutter Alignment:** Line numbers stay 100% aligned in a straight vertical column across all lines. Fold toggles sit between the gutter and code without protruding or clipping.
-- [ ] **Targeting Syntax:** The targeting token displays `Enemies.Closest()` and resolves to the closest frontline enemy.
-- [ ] **Dynamic Enemy Variety:** Rooms 1 to 8+ feature rotating compositions (1, 2, and 3 enemies) utilizing all 7 archetypes with progressive scaling.
-- [ ] **Inventory Sorting:** Manual sort chip cycles between Standard, Rarity (Legendary $\rightarrow$ Common), and Type.
+- [x] **Console Viewport Top Line Padding:**
+  - Launch battle and verify line 1 (e.g. `[Start] Initialized Player: MaxHP=20...`) has at least 8px top padding and is never clipped by `RectMask2D`.
+- [x] **Shield Absorbed Attack (0 HP Lost):**
+  - Player has 6 Shield, Enemy hits for 4 DMG (all absorbed, 0 HP lost).
+  - With `if (true)` slotted: Condition evaluates to `FALSE`. Player executes `ELSE` branch (`Attack(target)`).
+- [x] **Health Damage Taken (>0 HP Lost):**
+  - Player has 0 Shield, Enemy hits for 4 DMG (4 HP lost).
+  - With `if (true)` slotted: Condition evaluates to `TRUE`. Player executes `THEN` branch (`Defend(defendShield)`).
+- [x] **Boolean Inversion with `if (false)`:**
+  - Slot `false` into `if (...)` socket.
+  - When Shield absorbs damage (0 HP lost): Condition evaluates to `TRUE`. Player executes `THEN` branch.
+  - When HP is lost: Condition evaluates to `FALSE`. Player executes `ELSE` branch.
+- [x] **Starter Inventory:**
+  - Player starts with both `Bool_true` (pre-slotted in `OnTakeDamage`) and `Bool_false` in shelf inventory.

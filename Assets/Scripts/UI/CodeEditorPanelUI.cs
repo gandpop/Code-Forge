@@ -61,8 +61,9 @@ namespace CodeForge.UI
         [SerializeField] private ConditionTokenSO defaultCondition;
         [SerializeField] private ActionTokenSO defaultThenAction;
         [SerializeField] private ActionTokenSO defaultElseAction;
-        [SerializeField] private ConditionTokenSO defaultReactionCondition;
+        [SerializeField] private CodeTokenSO defaultReactionCondition;
         [SerializeField] private ActionTokenSO defaultReactionAction;
+        [SerializeField] private ActionTokenSO defaultReactionElseAction;
 
         [Header("Legacy Fallbacks (Preserves Scene References)")]
         [SerializeField] private CodeSocketUI attacksSocket;
@@ -721,14 +722,25 @@ namespace CodeForge.UI
                 }
                 else
                 {
+                    CodeTokenSO found = null;
                     var allTokens = Resources.FindObjectsOfTypeAll<CodeTokenSO>();
                     foreach (var t in allTokens)
                     {
                         if (t != null && t.name == req)
                         {
-                            uniqueList.Add(t);
+                            found = t;
                             break;
                         }
+                    }
+#if UNITY_EDITOR
+                    if (found == null)
+                    {
+                        found = UnityEditor.AssetDatabase.LoadAssetAtPath<CodeTokenSO>($"Assets/ScriptableObjects/Tokens/{req}.asset");
+                    }
+#endif
+                    if (found != null)
+                    {
+                        uniqueList.Add(found);
                     }
                 }
             }
@@ -1549,9 +1561,9 @@ namespace CodeForge.UI
             return socket != null ? socket.AssignedToken as ActionTokenSO : null;
         }
 
-        public ConditionTokenSO GetReactionConditionToken()
+        public CodeTokenSO GetReactionConditionToken()
         {
-            return reactionConditionSocket != null ? reactionConditionSocket.AssignedToken as ConditionTokenSO : null;
+            return reactionConditionSocket != null ? reactionConditionSocket.AssignedToken : null;
         }
 
         public ActionTokenSO GetReactionActionToken()
@@ -1566,18 +1578,22 @@ namespace CodeForge.UI
 
         private bool EvaluateSingleSocket(CodeSocketUI socket, CombatContext context)
         {
-            if (socket == null || socket.AssignedToken == null) return true;
+            if (socket == null) return true;
+            if (socket == reactionConditionSocket || socket == reactionCondition2Socket ||
+                socket.SocketRole == CodeSocketRole.ReactionCondition || socket.SocketRole == CodeSocketRole.ReactionCondition2)
+            {
+                bool tookHealthDamage = context != null && context.IncomingDamage > 0;
+                bool expectedBool = socket.AssignedToken != null ? socket.AssignedToken.boolValue : true;
+                bool result = (tookHealthDamage == expectedBool);
+                string dmgDesc = tookHealthDamage ? $"{context.IncomingDamage} HP lost" : "0 HP lost (shield absorbed all damage)";
+                string branch = result ? "THEN" : "ELSE";
+                ConsoleLogUI.Log($"[Reaction] Condition evaluated: Slotted '{expectedBool.ToString().ToLower()}', actual: {dmgDesc} -> Result: <b>{(result ? "<color=#98C379>TRUE (THEN)</color>" : "<color=#E06C75>FALSE (ELSE)</color>")}</b> -> Selected {branch} branch.");
+                return result;
+            }
+
+            if (socket.AssignedToken == null) return true;
             if (socket.AssignedToken.tokenType == CodeTokenType.Bool)
             {
-                if (socket == reactionConditionSocket || socket == reactionCondition2Socket ||
-                    socket.SocketRole == CodeSocketRole.ReactionCondition || socket.SocketRole == CodeSocketRole.ReactionCondition2)
-                {
-                    bool tookHealthDamage = context != null && context.IncomingDamage > 0;
-                    bool result = tookHealthDamage == socket.AssignedToken.boolValue;
-                    string dmgDesc = tookHealthDamage ? $"{context.IncomingDamage} HP lost" : "0 HP lost (shield absorbed hit)";
-                    ConsoleLogUI.Log($"[Reaction] Condition evaluated: Slotted '{socket.AssignedToken.boolValue.ToString().ToLower()}', actual: {dmgDesc} -> Result: <b>{(result ? "<color=#98C379>TRUE (THEN)</color>" : "<color=#E06C75>FALSE (ELSE)</color>")}</b>");
-                    return result;
-                }
                 return socket.AssignedToken.boolValue;
             }
             if (socket.AssignedToken is ConditionTokenSO cond) return cond.Evaluate(context);
