@@ -24,6 +24,13 @@ namespace CodeForge.Combat
         [System.Obsolete] public StanceTokenSO SlottedStanceToken { get; private set; }
         public float EffectiveDamageMultiplier => Mathf.Max(0.1f, DamageMultiplier);
 
+        [Header("Animation & Visuals")]
+        [SerializeField] private Animator animator;
+        [SerializeField] private SpriteRenderer spriteRenderer;
+
+        public Animator Animator => animator;
+        public SpriteRenderer SpriteRenderer => spriteRenderer;
+
         private Vector3 initialPosition;
 
         protected override void Awake()
@@ -31,6 +38,18 @@ namespace CodeForge.Combat
             maxHp = 20f;
             base.Awake();
             initialPosition = transform.position;
+            if (animator == null) animator = GetComponentInChildren<Animator>();
+            if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        }
+
+        private void OnValidate()
+        {
+            // Maintain 1:1 square pixel art aspect ratio so sprites never get squished
+            if (transform.localScale.y > 0f && (Mathf.Abs(transform.localScale.x - transform.localScale.y) > 0.001f || Mathf.Abs(transform.localScale.z - 1.0f) > 0.001f))
+            {
+                float uniform = transform.localScale.y;
+                transform.localScale = new Vector3(uniform, uniform, 1.0f);
+            }
         }
 
         public void SetMaxHealth(int amount)
@@ -68,7 +87,12 @@ namespace CodeForge.Combat
 
         public IEnumerator PerformAttackAnimation()
         {
-            yield return PerformAttackLunge(new Vector3(0.5f, 0.3f, 0f));
+            if (animator != null)
+            {
+                animator.ResetTrigger("Attack");
+                animator.SetTrigger("Attack");
+            }
+            yield return PerformAttackLunge(new Vector3(0.5f, 0.3f, 0f), 0.20f, 0.15f);
         }
 
         /// <summary>
@@ -429,24 +453,29 @@ namespace CodeForge.Combat
             return living[Random.Range(0, living.Count)];
         }
 
-        private IEnumerator PerformAttackLunge(Vector3 offset, float duration = 0.12f)
+        private IEnumerator PerformAttackLunge(Vector3 offset, float lungeDuration = 0.20f, float strikePause = 0.15f)
         {
             Vector3 startPos = transform.position;
             Vector3 targetPos = startPos + offset;
 
             float elapsed = 0f;
-            while (elapsed < duration)
+            while (elapsed < lungeDuration)
             {
                 elapsed += Time.deltaTime;
-                transform.position = Vector3.Lerp(startPos, targetPos, elapsed / duration);
+                transform.position = Vector3.Lerp(startPos, targetPos, elapsed / lungeDuration);
                 yield return null;
             }
 
+            if (strikePause > 0f)
+            {
+                yield return new WaitForSeconds(strikePause);
+            }
+
             elapsed = 0f;
-            while (elapsed < duration)
+            while (elapsed < lungeDuration)
             {
                 elapsed += Time.deltaTime;
-                transform.position = Vector3.Lerp(targetPos, startPos, elapsed / duration);
+                transform.position = Vector3.Lerp(targetPos, startPos, elapsed / lungeDuration);
                 yield return null;
             }
 
