@@ -42,16 +42,6 @@ namespace CodeForge.Combat
             if (spriteRenderer == null) spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
 
-        private void OnValidate()
-        {
-            // Maintain 1:1 square pixel art aspect ratio so sprites never get squished
-            if (transform.localScale.y > 0f && (Mathf.Abs(transform.localScale.x - transform.localScale.y) > 0.001f || Mathf.Abs(transform.localScale.z - 1.0f) > 0.001f))
-            {
-                float uniform = transform.localScale.y;
-                transform.localScale = new Vector3(uniform, uniform, 1.0f);
-            }
-        }
-
         public void SetMaxHealth(int amount)
         {
             if (amount <= 0) amount = 20;

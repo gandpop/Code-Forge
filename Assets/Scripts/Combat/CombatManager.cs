@@ -106,10 +106,10 @@ namespace CodeForge.Combat
                 2 => "Room 2: 'The Variable Forge' (Class Fields)",
                 3 => "Room 3: 'The Reaction Test' (OnTakeDamage Callback)",
                 4 => "Room 4: 'Double Threat' (Slime Tank & Glass Cannon)",
-                5 => "Room 5: 'Syntax Error' (Syntax Glitch & Shield Beetle Elite)",
-                6 => "Room 6: 'Swarm Routine' (Glitch Minion, Shield Beetle & Slime Boss)",
+                5 => "Room 5: 'Syntax Error' (Syntax Glitch & Skeleton Elite)",
+                6 => "Room 6: 'Swarm Routine' (Glitch Minion, Skeleton & Slime Boss)",
                 7 => "Room 7: 'Memory Corruption' (Syntax Glitch, Memory Leak & Golem Elite)",
-                8 => "Room 8: 'The Core Golem' (Golem Boss & Shield Beetles)",
+                8 => "Room 8: 'The Core Golem' (Golem Boss & Skeletons)",
                 _ => $"Room {currentRoomIndex}: Scaling Dungeon"
             };
 
@@ -329,8 +329,8 @@ namespace CodeForge.Combat
                     break;
 
                 case 2:
-                    // Room 2: 1x Shield Beetle (30 HP, 6 DMG / 12 Shield)
-                    SpawnEnemy("Shield_Beetle", 1, 30f, 6f, EnemyArchetype.ShieldBeetle);
+                    // Room 2: 1x Skeleton (30 HP, 6 DMG / 12 Shield)
+                    SpawnEnemy("Skeleton", 1, 30f, 6f, EnemyArchetype.Skeleton);
                     break;
 
                 case 3:
@@ -345,15 +345,15 @@ namespace CodeForge.Combat
                     break;
 
                 case 5:
-                    // Room 5: 2 Enemies — Syntax Glitch (Frontline) + Shield Beetle Elite (Midline)
+                    // Room 5: 2 Enemies — Syntax Glitch (Frontline) + Skeleton Elite (Midline)
                     SpawnEnemy("Syntax_Glitch", 1, 28f, 8f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Shield_Beetle_Elite", 2, 35f, 7f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Skeleton_Elite", 2, 35f, 7f, EnemyArchetype.Skeleton);
                     break;
 
                 case 6:
-                    // Room 6: 3 Enemies — Glitch Minion (Frontline) + Shield Beetle (Midline) + Slime Tank Boss (Backline)
+                    // Room 6: 3 Enemies — Glitch Minion (Frontline) + Skeleton (Midline) + Slime Tank Boss (Backline)
                     SpawnEnemy("Glitch_Minion", 1, 16f, 3f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Shield_Beetle", 2, 25f, 5f, EnemyArchetype.ShieldBeetle);
+                    SpawnEnemy("Skeleton", 2, 25f, 5f, EnemyArchetype.Skeleton);
                     SpawnEnemy("Slime_Tank_Boss", 3, 40f, 6f, EnemyArchetype.SlimeTank);
                     break;
 
@@ -365,9 +365,9 @@ namespace CodeForge.Combat
                     break;
 
                 case 8:
-                    // Room 8: 3 Enemies — Shield Beetle (Frontline) + Shield Beetle (Midline) + Golem Boss (Backline)
-                    SpawnEnemy("Shield_Beetle_Front", 1, 30f, 5f, EnemyArchetype.ShieldBeetle);
-                    SpawnEnemy("Shield_Beetle_Mid", 2, 30f, 5f, EnemyArchetype.ShieldBeetle);
+                    // Room 8: 3 Enemies — Skeleton (Frontline) + Skeleton (Midline) + Golem Boss (Backline)
+                    SpawnEnemy("Skeleton_Front", 1, 30f, 5f, EnemyArchetype.Skeleton);
+                    SpawnEnemy("Skeleton_Mid", 2, 30f, 5f, EnemyArchetype.Skeleton);
                     SpawnEnemy("Golem_Boss", 3, 65f, 16f, EnemyArchetype.GolemCharger);
                     break;
 
@@ -383,8 +383,8 @@ namespace CodeForge.Combat
                     }
                     else if (cycle == 1)
                     {
-                        SpawnEnemy($"Shield_Beetle_1_R{room}", 1, 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
-                        SpawnEnemy($"Shield_Beetle_2_R{room}", 2, 28f * scale, 5f * scale, EnemyArchetype.ShieldBeetle);
+                        SpawnEnemy($"Skeleton_1_R{room}", 1, 28f * scale, 5f * scale, EnemyArchetype.Skeleton);
+                        SpawnEnemy($"Skeleton_2_R{room}", 2, 28f * scale, 5f * scale, EnemyArchetype.Skeleton);
                         SpawnEnemy($"Golem_Boss_R{room}", 3, 60f * scale, 18f * scale, EnemyArchetype.GolemCharger);
                     }
                     else

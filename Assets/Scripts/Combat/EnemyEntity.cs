@@ -19,7 +19,8 @@ namespace CodeForge.Combat
     {
         Default,
         TrainingSlime,   // 3 DMG flat every turn
-        ShieldBeetle,    // Turn 1 [SHIELD 12], Turn 2 [ATK 6], repeat
+        Skeleton,        // Turn 1 [SHIELD 12], Turn 2 [ATK 6], repeat
+        [System.Obsolete("Use Skeleton instead")] ShieldBeetle = Skeleton,
         GlassCannon,     // 9 DMG flat every turn
         SlimeTank,       // 4 DMG flat every turn
         GolemCharger,    // Turn 1 [CHARGE], Turn 2 [CHARGE], Turn 3 [HEAVY 22], repeat
@@ -77,6 +78,18 @@ namespace CodeForge.Combat
         public EnemyIntent CurrentIntent { get; private set; }
         public event Action<EnemyIntent> OnIntentChanged;
 
+        [Header("Sprite Visuals")]
+        [SerializeField] private RuntimeAnimatorController slimeController;
+        [SerializeField] private RuntimeAnimatorController skeletonController;
+        [SerializeField] private Material spriteMaterial;
+
+        [Header("Visual Switcher")]
+        [SerializeField] private GameObject meshVisual;
+        [SerializeField] private GameObject spriteVisual;
+        [SerializeField] private SpriteRenderer spriteRenderer;
+        [SerializeField] private Animator spriteAnimator;
+        [SerializeField] private Canvas healthBarCanvas;
+
         private Transform visualChild;
         private Vector3 visualOriginalPos;
 
@@ -84,41 +97,98 @@ namespace CodeForge.Combat
         {
             base.Awake();
             originalLocalPos = transform.localPosition;
-            EnsureVisualChild();
+            SetupVisualForArchetype();
         }
 
         public void EnsureVisualChild()
         {
             if (visualChild != null) return;
+            if (spriteVisual != null && spriteVisual.activeSelf) visualChild = spriteVisual.transform;
+            else if (meshVisual != null && meshVisual.activeSelf) visualChild = meshVisual.transform;
+            else visualChild = transform.Find("SpriteVisual") ?? transform.Find("Visual") ?? transform;
+            visualOriginalPos = visualChild.localPosition;
+        }
 
-            visualChild = transform.Find("Visual") ?? transform.Find("Sprite") ?? transform.Find("Cube");
-            if (visualChild == null)
+        public void SetupVisualForArchetype()
+        {
+            if (meshVisual == null)
             {
-                var meshFilter = GetComponent<MeshFilter>();
-                var meshRenderer = GetComponent<MeshRenderer>();
-                if (meshFilter != null && meshRenderer != null)
+                var mv = transform.Find("Visual") ?? transform.Find("MeshVisual");
+                if (mv != null) meshVisual = mv.gameObject;
+            }
+            if (spriteVisual == null)
+            {
+                var sv = transform.Find("SpriteVisual");
+                if (sv != null)
                 {
-                    GameObject vObj = new GameObject("Visual", typeof(MeshFilter), typeof(MeshRenderer));
-                    vObj.transform.SetParent(transform, false);
-                    vObj.transform.localPosition = Vector3.zero;
-                    vObj.transform.localRotation = Quaternion.identity;
-                    vObj.transform.localScale = new Vector3(1.3f, 1.3f, 1.3f);
-
-                    var childMF = vObj.GetComponent<MeshFilter>();
-                    childMF.sharedMesh = meshFilter.sharedMesh;
-                    var childMR = vObj.GetComponent<MeshRenderer>();
-                    childMR.sharedMaterials = meshRenderer.sharedMaterials;
-
-                    Destroy(meshRenderer);
-                    Destroy(meshFilter);
-                    visualChild = vObj.transform;
+                    spriteVisual = sv.gameObject;
+                }
+                else
+                {
+                    var newObj = new GameObject("SpriteVisual", typeof(SpriteRenderer), typeof(Animator));
+                    newObj.transform.SetParent(transform, false);
+                    spriteVisual = newObj;
                 }
             }
-            if (visualChild != null)
+
+            if (spriteRenderer == null && spriteVisual != null) spriteRenderer = spriteVisual.GetComponent<SpriteRenderer>();
+            if (spriteAnimator == null && spriteVisual != null) spriteAnimator = spriteVisual.GetComponent<Animator>();
+            if (healthBarCanvas == null) healthBarCanvas = GetComponentInChildren<Canvas>(true);
+
+            bool isSlime = archetype == EnemyArchetype.TrainingSlime || archetype == EnemyArchetype.SlimeTank || gameObject.name.IndexOf("Slime", StringComparison.OrdinalIgnoreCase) >= 0;
+            bool isSkeleton = archetype == EnemyArchetype.Skeleton || gameObject.name.IndexOf("Skeleton", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Shield_Beetle", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (isSlime || isSkeleton)
             {
-                visualChild.localScale = new Vector3(1.3f, 1.3f, 1.3f);
-                visualOriginalPos = visualChild.localPosition;
+                if (meshVisual != null) meshVisual.SetActive(false);
+                if (spriteVisual != null) spriteVisual.SetActive(true);
+
+#if UNITY_EDITOR
+                if (slimeController == null)
+                    slimeController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SlimeAnimatorController.controller");
+                if (skeletonController == null)
+                    skeletonController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SkeletonAnimatorController.controller");
+                if (spriteMaterial == null)
+                    spriteMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Sprite_Unlit.mat");
+#endif
+
+                if (spriteRenderer != null)
+                {
+                    if (spriteMaterial != null) spriteRenderer.sharedMaterial = spriteMaterial;
+                    spriteRenderer.sortingOrder = 5;
+                }
+
+                if (isSlime)
+                {
+                    if (spriteAnimator != null && slimeController != null) spriteAnimator.runtimeAnimatorController = slimeController;
+                    if (spriteAnimator != null) spriteAnimator.enabled = true;
+
+                    bool isBossOrTank = archetype == EnemyArchetype.SlimeTank || gameObject.name.IndexOf("Boss", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Tank", StringComparison.OrdinalIgnoreCase) >= 0;
+                    spriteVisual.transform.localScale = isBossOrTank ? new Vector3(3.0f, 3.0f, 1f) : new Vector3(2.2f, 2.2f, 1f);
+                    spriteVisual.transform.localPosition = new Vector3(0f, 0.40f, 0f);
+                    if (healthBarCanvas != null) healthBarCanvas.transform.localPosition = new Vector3(0f, isBossOrTank ? 1.5f : 1.3f, 0f);
+                }
+                else
+                {
+                    if (spriteAnimator != null && skeletonController != null) spriteAnimator.runtimeAnimatorController = skeletonController;
+                    if (spriteAnimator != null) spriteAnimator.enabled = true;
+
+                    bool isEliteOrBoss = gameObject.name.IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Boss", StringComparison.OrdinalIgnoreCase) >= 0;
+                    spriteVisual.transform.localScale = isEliteOrBoss ? new Vector3(2.8f, 2.8f, 1f) : new Vector3(2.4f, 2.4f, 1f);
+                    spriteVisual.transform.localPosition = new Vector3(0f, 0.50f, 0f);
+                    if (healthBarCanvas != null) healthBarCanvas.transform.localPosition = new Vector3(0f, isEliteOrBoss ? 1.7f : 1.5f, 0f);
+                }
+
+                visualChild = spriteVisual.transform;
             }
+            else
+            {
+                if (meshVisual != null) meshVisual.SetActive(true);
+                if (spriteVisual != null) spriteVisual.SetActive(false);
+                visualChild = meshVisual != null ? meshVisual.transform : transform;
+            }
+
+            if (visualChild != null) visualOriginalPos = visualChild.localPosition;
         }
 
         private void Update()
@@ -146,6 +216,7 @@ namespace CodeForge.Combat
             currentBleedDamage = 0;
             currentBleedDuration = 0;
             gameObject.SetActive(true);
+            SetupVisualForArchetype();
             EnsureIntentPlateUI();
             RollNextIntent(1);
         }
@@ -212,7 +283,7 @@ namespace CodeForge.Combat
                     nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 3f));
                     break;
 
-                case EnemyArchetype.ShieldBeetle:
+                case EnemyArchetype.Skeleton:
                     // Odd turns: Shield 12, Even turns: Attack contactDamage (default 6)
                     if (turn % 2 == 1)
                         nextIntent = new EnemyIntent(EnemyIntentType.Shield, 12);
