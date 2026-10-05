@@ -120,11 +120,18 @@ namespace CodeForge.UI
             var headerText = headerTr.GetComponent<TextMeshProUGUI>();
             if (headerText != null)
             {
+                if (headerText.font == null || headerText.font.name == "BoldPixels_SDF")
+                {
+                    headerText.font = TMPro.TMP_Settings.defaultFontAsset;
+                }
                 if (string.IsNullOrEmpty(headerText.text) || headerText.text.Trim() == "")
                 {
                     headerText.text = "Battle Console Output  <size=80%><color=#808080>[Debug.Log Engine]</color></size>";
                 }
-                headerText.fontSize = 14.5f;
+                if (headerText.fontSize <= 0f)
+                {
+                    headerText.fontSize = 14f;
+                }
                 headerText.alignment = TextAlignmentOptions.MidlineLeft;
                 headerText.raycastTarget = false;
             }
@@ -168,9 +175,18 @@ namespace CodeForge.UI
                     logTextDisplay.transform.SetParent(viewportRt, false);
                 }
 
-                // Respect user inspector settings; only set fallback if uninitialized
-                if (logTextDisplay.fontSize <= 0f) logTextDisplay.fontSize = 15.5f;
-                if (logTextDisplay.lineSpacing == 0f) logTextDisplay.lineSpacing = 4f;
+                if (logTextDisplay.font == null || logTextDisplay.font.name == "BoldPixels_SDF")
+                {
+                    logTextDisplay.font = TMPro.TMP_Settings.defaultFontAsset;
+                }
+                if (logTextDisplay.fontSize <= 0f)
+                {
+                    logTextDisplay.fontSize = 14.5f;
+                }
+                if (logTextDisplay.lineSpacing == 0f)
+                {
+                    logTextDisplay.lineSpacing = 4f;
+                }
 
                 var rt = logTextDisplay.rectTransform;
                 rt.pivot = new Vector2(0.5f, 1f);
@@ -179,7 +195,10 @@ namespace CodeForge.UI
                 rt.anchoredPosition = new Vector2(0f, -4f);
                 rt.sizeDelta = Vector2.zero;
 
-                logTextDisplay.margin = new Vector4(6f, 8f, 6f, 6f);
+                if (logTextDisplay.margin == Vector4.zero)
+                {
+                    logTextDisplay.margin = new Vector4(6f, 8f, 6f, 6f);
+                }
 
                 var csf = logTextDisplay.GetComponent<ContentSizeFitter>();
                 if (csf == null) csf = logTextDisplay.gameObject.AddComponent<ContentSizeFitter>();

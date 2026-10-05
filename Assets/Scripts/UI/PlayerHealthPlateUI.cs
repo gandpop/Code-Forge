@@ -12,18 +12,113 @@ namespace CodeForge.UI
         [SerializeField] private TextMeshProUGUI hpText;
         [SerializeField] private Image healthFillImage;
         [SerializeField] private Image shieldFillImage;
+        [SerializeField] private TMP_FontAsset pixelFont;
 
         private float targetHealthFill = 1f;
         private float targetShieldFill = 0f;
+
+        private string cachedPrefix = "PLAYER  ";
+        private string cachedSuffix = " HP";
+        private bool hasNumberPattern = false;
+        private bool isTemplateInitialized = false;
+        private string initialTextPattern;
+        private string lastRenderedText;
+
+        public void ResetTemplate()
+        {
+            isTemplateInitialized = false;
+        }
+
+        private void InitializeTextTemplate()
+        {
+            if (isTemplateInitialized) return;
+            if (hpText == null) return;
+
+            string sourceText = hpText.text;
+            if (string.IsNullOrEmpty(sourceText))
+            {
+                sourceText = "PLAYER  20/20 HP";
+            }
+
+            initialTextPattern = sourceText;
+
+            if (sourceText.Contains("{current}") || sourceText.Contains("{max}") || sourceText.Contains("{hp}"))
+            {
+                hasNumberPattern = false;
+                isTemplateInitialized = true;
+                return;
+            }
+
+            var match = System.Text.RegularExpressions.Regex.Match(sourceText, @"\b\d+(\s*/\s*\d+)?\b");
+            if (match.Success)
+            {
+                cachedPrefix = sourceText.Substring(0, match.Index);
+                cachedSuffix = sourceText.Substring(match.Index + match.Length);
+                hasNumberPattern = true;
+            }
+            else
+            {
+                hasNumberPattern = false;
+            }
+
+            isTemplateInitialized = true;
+        }
+
+        public string FormatHpText(float current, float max, int shield)
+        {
+            InitializeTextTemplate();
+
+            string shieldBadge = shield > 0 ? $"  <color=#55AAFF>(+{shield} SHIELD)</color>" : "";
+
+            if (!string.IsNullOrEmpty(initialTextPattern) && (initialTextPattern.Contains("{current}") || initialTextPattern.Contains("{max}") || initialTextPattern.Contains("{hp}")))
+            {
+                string result = initialTextPattern
+                    .Replace("{current}", Mathf.CeilToInt(current).ToString())
+                    .Replace("{max}", Mathf.CeilToInt(max).ToString())
+                    .Replace("{hp}", $"{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)}")
+                    .Replace("{shield}", shield > 0 ? $"(+{shield} SHIELD)" : "");
+
+                if (!initialTextPattern.Contains("{shield}"))
+                {
+                    result += shieldBadge;
+                }
+                return result;
+            }
+
+            if (hasNumberPattern)
+            {
+                return $"{cachedPrefix}{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)}{cachedSuffix}{shieldBadge}";
+            }
+
+            return $"{initialTextPattern}{shieldBadge}";
+        }
+
+        public void EnsureFont()
+        {
+#if UNITY_EDITOR
+            if (pixelFont == null)
+            {
+                pixelFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/Fonts/BoldPixels_SDF.asset");
+            }
+#endif
+            if (hpText != null && hpText.font == null && pixelFont != null)
+            {
+                hpText.font = pixelFont;
+            }
+        }
 
         private void Awake()
         {
             EnsureShieldFill();
             EnsureValidSprites();
-            if (hpText != null)
+            EnsureFont();
+
+            if (Application.isPlaying)
             {
-                hpText.fontSize = 20f;
+                isTemplateInitialized = false;
+                InitializeTextTemplate();
             }
+
             if (player == null)
             {
                 player = FindFirstObjectByType<PlayerCombatController>();
@@ -35,6 +130,13 @@ namespace CodeForge.UI
         {
             EnsureShieldFill();
             EnsureValidSprites();
+
+            if (Application.isPlaying)
+            {
+                isTemplateInitialized = false;
+                InitializeTextTemplate();
+            }
+
             if (player == null)
             {
                 player = FindFirstObjectByType<PlayerCombatController>();
@@ -114,10 +216,6 @@ namespace CodeForge.UI
         {
             EnsureShieldFill();
             EnsureValidSprites();
-            if (hpText != null)
-            {
-                hpText.fontSize = 20f;
-            }
 
             if (player == null)
             {
@@ -218,18 +316,33 @@ namespace CodeForge.UI
 
             if (hpText != null)
             {
-                string shieldBadge = shield > 0 ? $"  <color=#55AAFF><b>(+{shield} SHIELD)</b></color>" : "";
-                hpText.text = $"<size=115%><b>PLAYER</b></size>    <b>{Mathf.CeilToInt(current)}/{Mathf.CeilToInt(max)} HP</b>{shieldBadge}";
+                EnsureFont();
+                if (Application.isPlaying)
+                {
+                    // If user manually edited hpText in the inspector during Play Mode, update template
+                    if (lastRenderedText != null && hpText.text != lastRenderedText)
+                    {
+                        isTemplateInitialized = false;
+                        InitializeTextTemplate();
+                    }
+
+                    string newText = FormatHpText(current, max, shield);
+                    hpText.text = newText;
+                    lastRenderedText = newText;
+                }
             }
         }
 
 #if UNITY_EDITOR
-        private void Update()
+        private void OnValidate()
         {
             if (!Application.isPlaying)
             {
-                EnsureShieldFill();
-                EnsureValidSprites();
+                isTemplateInitialized = false;
+            }
+            else
+            {
+                isTemplateInitialized = false;
                 RefreshDisplay();
             }
         }

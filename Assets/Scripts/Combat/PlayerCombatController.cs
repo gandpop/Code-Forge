@@ -434,7 +434,7 @@ namespace CodeForge.Combat
             for (int i = 0; i < enemies.Count; i++)
             {
                 var current = enemies[i];
-                if (current != null && !current.IsDead)
+                if (current != null && !current.IsDead && current.CurrentHp > 0 && current.gameObject.activeInHierarchy)
                 {
                     living.Add(current);
                 }

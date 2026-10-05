@@ -93,7 +93,12 @@ namespace CodeForge.Data
                     else
                     {
                         var target = context.CurrentTarget;
-                        if (target != null && !target.IsDead)
+                        if (target == null || target.IsDead || target.CurrentHp <= 0 || !target.gameObject.activeInHierarchy)
+                        {
+                            target = context.Player != null ? context.Player.SelectFallbackTarget(context.ActiveEnemies) : null;
+                        }
+
+                        if (target != null && !target.IsDead && target.CurrentHp > 0 && target.gameObject.activeInHierarchy)
                         {
                             ConsoleLogUI.Log($"[Action] Executing '{GetFormattedCodeString()}' on {target.name}{multText}{(isPiercing ? " (Piercing)" : "")}!");
                             target.TakeDamage(finalDamage, isPiercing);

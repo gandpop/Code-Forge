@@ -17,15 +17,19 @@ namespace CodeForge.Combat
 
     public enum EnemyArchetype
     {
-        Default,
-        TrainingSlime,   // 3 DMG flat every turn
-        Skeleton,        // Turn 1 [SHIELD 12], Turn 2 [ATK 6], repeat
-        [System.Obsolete("Use Skeleton instead")] ShieldBeetle = Skeleton,
-        GlassCannon,     // 9 DMG flat every turn
-        SlimeTank,       // 4 DMG flat every turn
-        GolemCharger,    // Turn 1 [CHARGE], Turn 2 [CHARGE], Turn 3 [HEAVY 22], repeat
-        MemoryLeak,      // 5 DMG, heals on unshielded hit, every 3 turns permanently +2 DMG
-        SyntaxGlitch     // Rotates between [DEBUFF] (reduces player dmgMult by 0.2x) and [ATK 8]
+        TrainingSlime = 0,
+        Skeleton = 1,
+        SlimeTank = 2,
+        StoneGolem = 3,
+        DemonicEye = 4,
+        Vampire = 5,
+        [System.Obsolete("Use StoneGolem instead")] GolemCharger = 10,
+        [System.Obsolete("Use DemonicEye instead")] Default = 11,
+        [System.Obsolete("Use DemonicEye instead")] GlitchBug = 12,
+        [System.Obsolete("Use Vampire instead")] MemoryLeak = 13,
+        [System.Obsolete("Use Skeleton instead")] ShieldBeetle = 14,
+        [System.Obsolete("Deprecated")] GlassCannon = 15,
+        [System.Obsolete("Deprecated")] SyntaxGlitch = 16
     }
 
     [System.Serializable]
@@ -55,7 +59,7 @@ namespace CodeForge.Combat
     public class EnemyEntity : CombatEntity
     {
         [Header("Enemy Attributes")]
-        public EnemyArchetype archetype = EnemyArchetype.Default;
+        public EnemyArchetype archetype = EnemyArchetype.DemonicEye;
         public int slotIndex = 1;
         public float contactDamage = 10f;
         private CombatEntity playerTarget;
@@ -81,6 +85,15 @@ namespace CodeForge.Combat
         [Header("Sprite Visuals")]
         [SerializeField] private RuntimeAnimatorController slimeController;
         [SerializeField] private RuntimeAnimatorController skeletonController;
+        [SerializeField] private RuntimeAnimatorController stoneGolemController;
+        [SerializeField] private RuntimeAnimatorController demonicEyeController;
+        [SerializeField] private RuntimeAnimatorController vampireController;
+
+        [SerializeField] private Sprite slimeSprite;
+        [SerializeField] private Sprite skeletonSprite;
+        [SerializeField] private Sprite stoneGolemSprite;
+        [SerializeField] private Sprite demonicEyeSprite;
+        [SerializeField] private Sprite vampireSprite;
         [SerializeField] private Material spriteMaterial;
 
         [Header("Visual Switcher")]
@@ -97,7 +110,7 @@ namespace CodeForge.Combat
         {
             base.Awake();
             originalLocalPos = transform.localPosition;
-            SetupVisualForArchetype();
+            ApplyArchetype();
         }
 
         public void EnsureVisualChild()
@@ -109,7 +122,7 @@ namespace CodeForge.Combat
             visualOriginalPos = visualChild.localPosition;
         }
 
-        public void SetupVisualForArchetype()
+        public void ApplyArchetype()
         {
             if (meshVisual == null)
             {
@@ -135,61 +148,153 @@ namespace CodeForge.Combat
             if (spriteAnimator == null && spriteVisual != null) spriteAnimator = spriteVisual.GetComponent<Animator>();
             if (healthBarCanvas == null) healthBarCanvas = GetComponentInChildren<Canvas>(true);
 
-            bool isSlime = archetype == EnemyArchetype.TrainingSlime || archetype == EnemyArchetype.SlimeTank || gameObject.name.IndexOf("Slime", StringComparison.OrdinalIgnoreCase) >= 0;
-            bool isSkeleton = archetype == EnemyArchetype.Skeleton || gameObject.name.IndexOf("Skeleton", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Shield_Beetle", StringComparison.OrdinalIgnoreCase) >= 0;
-
-            if (isSlime || isSkeleton)
-            {
-                if (meshVisual != null) meshVisual.SetActive(false);
-                if (spriteVisual != null) spriteVisual.SetActive(true);
-
 #if UNITY_EDITOR
-                if (slimeController == null)
-                    slimeController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SlimeAnimatorController.controller");
-                if (skeletonController == null)
-                    skeletonController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SkeletonAnimatorController.controller");
-                if (spriteMaterial == null)
-                    spriteMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Sprite_Unlit.mat");
+            if (slimeController == null)
+                slimeController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SlimeAnimatorController.controller");
+            if (skeletonController == null)
+                skeletonController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/SkeletonAnimatorController.controller");
+            if (stoneGolemController == null)
+                stoneGolemController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/StoneGolemAnimatorController.controller");
+            if (demonicEyeController == null)
+                demonicEyeController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/DemonicEyeAnimatorController.controller");
+            if (vampireController == null)
+                vampireController = UnityEditor.AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>("Assets/Animations/Enemies/VampireAnimatorController.controller");
+
+            if (slimeSprite == null)
+                slimeSprite = LoadFirstSprite("Assets/Sprites/Enemies/SlimeIdle.png");
+            if (skeletonSprite == null)
+                skeletonSprite = LoadFirstSprite("Assets/Sprites/Enemies/SkeletonIdle.png");
+            if (stoneGolemSprite == null)
+                stoneGolemSprite = LoadFirstSprite("Assets/Sprites/Enemies/StoneGolem.png");
+            if (demonicEyeSprite == null)
+                demonicEyeSprite = LoadFirstSprite("Assets/Sprites/Enemies/DemonicEye.png");
+            if (vampireSprite == null)
+                vampireSprite = LoadFirstSprite("Assets/Sprites/Enemies/Vampire.png");
+
+            if (spriteMaterial == null)
+                spriteMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Materials/Sprite_Unlit.mat");
 #endif
 
-                if (spriteRenderer != null)
-                {
-                    if (spriteMaterial != null) spriteRenderer.sharedMaterial = spriteMaterial;
-                    spriteRenderer.sortingOrder = 5;
-                }
+            Sprite chosenSprite = null;
+            RuntimeAnimatorController chosenController = null;
+            Vector3 chosenScale = Vector3.one;
+            float localY = 0.50f;
+            float intentBadgeY = 1.5f;
 
-                if (isSlime)
-                {
-                    if (spriteAnimator != null && slimeController != null) spriteAnimator.runtimeAnimatorController = slimeController;
-                    if (spriteAnimator != null) spriteAnimator.enabled = true;
+            switch (archetype)
+            {
+                case EnemyArchetype.StoneGolem:
+                case EnemyArchetype.GolemCharger:
+                    chosenSprite = stoneGolemSprite;
+                    chosenController = stoneGolemController;
+                    chosenScale = new Vector3(3.6f, 3.6f, 1f);
+                    localY = 0.40f;
+                    intentBadgeY = 2.45f;
+                    break;
 
-                    bool isBossOrTank = archetype == EnemyArchetype.SlimeTank || gameObject.name.IndexOf("Boss", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Tank", StringComparison.OrdinalIgnoreCase) >= 0;
-                    spriteVisual.transform.localScale = isBossOrTank ? new Vector3(3.0f, 3.0f, 1f) : new Vector3(2.2f, 2.2f, 1f);
-                    spriteVisual.transform.localPosition = new Vector3(0f, 0.40f, 0f);
-                    if (healthBarCanvas != null) healthBarCanvas.transform.localPosition = new Vector3(0f, isBossOrTank ? 1.5f : 1.3f, 0f);
+                case EnemyArchetype.DemonicEye:
+                case EnemyArchetype.Default:
+                case EnemyArchetype.GlitchBug:
+                case EnemyArchetype.GlassCannon:
+                case EnemyArchetype.SyntaxGlitch:
+                    chosenSprite = demonicEyeSprite;
+                    chosenController = demonicEyeController;
+                    chosenScale = new Vector3(2.2f, 2.2f, 1f);
+                    localY = 0.70f;
+                    intentBadgeY = 2.05f;
+                    break;
+
+                case EnemyArchetype.Vampire:
+                case EnemyArchetype.MemoryLeak:
+                    chosenSprite = vampireSprite;
+                    chosenController = vampireController;
+                    chosenScale = new Vector3(2.6f, 2.6f, 1f);
+                    localY = 0.50f;
+                    intentBadgeY = 2.05f;
+                    break;
+
+                case EnemyArchetype.SlimeTank:
+                    chosenSprite = slimeSprite;
+                    chosenController = slimeController;
+                    chosenScale = new Vector3(3.0f, 3.0f, 1f);
+                    localY = 0.40f;
+                    intentBadgeY = 2.10f;
+                    break;
+
+                case EnemyArchetype.Skeleton:
+                case EnemyArchetype.ShieldBeetle:
+                    chosenSprite = skeletonSprite;
+                    chosenController = skeletonController;
+                    chosenScale = new Vector3(2.6f, 2.6f, 1f);
+                    localY = 0.50f;
+                    intentBadgeY = 2.05f;
+                    break;
+
+                case EnemyArchetype.TrainingSlime:
+                default:
+                    chosenSprite = slimeSprite;
+                    chosenController = slimeController;
+                    chosenScale = new Vector3(2.2f, 2.2f, 1f);
+                    localY = 0.40f;
+                    intentBadgeY = 1.70f;
+                    break;
+            }
+
+            if (meshVisual != null) meshVisual.SetActive(false);
+            if (spriteVisual != null)
+            {
+                spriteVisual.SetActive(true);
+                spriteVisual.transform.localScale = chosenScale;
+                spriteVisual.transform.localPosition = new Vector3(0f, localY, 0f);
+            }
+
+            if (spriteRenderer != null)
+            {
+                if (chosenSprite != null) spriteRenderer.sprite = chosenSprite;
+                if (spriteMaterial != null) spriteRenderer.sharedMaterial = spriteMaterial;
+                spriteRenderer.sortingOrder = 5;
+            }
+
+            if (spriteAnimator != null)
+            {
+                if (chosenController != null)
+                {
+                    spriteAnimator.runtimeAnimatorController = chosenController;
+                    spriteAnimator.enabled = true;
                 }
                 else
                 {
-                    if (spriteAnimator != null && skeletonController != null) spriteAnimator.runtimeAnimatorController = skeletonController;
-                    if (spriteAnimator != null) spriteAnimator.enabled = true;
-
-                    bool isEliteOrBoss = gameObject.name.IndexOf("Elite", StringComparison.OrdinalIgnoreCase) >= 0 || gameObject.name.IndexOf("Boss", StringComparison.OrdinalIgnoreCase) >= 0;
-                    spriteVisual.transform.localScale = isEliteOrBoss ? new Vector3(2.8f, 2.8f, 1f) : new Vector3(2.4f, 2.4f, 1f);
-                    spriteVisual.transform.localPosition = new Vector3(0f, 0.50f, 0f);
-                    if (healthBarCanvas != null) healthBarCanvas.transform.localPosition = new Vector3(0f, isEliteOrBoss ? 1.7f : 1.5f, 0f);
+                    spriteAnimator.enabled = false;
                 }
-
-                visualChild = spriteVisual.transform;
             }
-            else
+
+            if (healthBarCanvas != null)
             {
-                if (meshVisual != null) meshVisual.SetActive(true);
-                if (spriteVisual != null) spriteVisual.SetActive(false);
-                visualChild = meshVisual != null ? meshVisual.transform : transform;
+                healthBarCanvas.overrideSorting = true;
+                healthBarCanvas.sortingOrder = 20;
+                healthBarCanvas.transform.localPosition = new Vector3(0f, intentBadgeY, 0f);
             }
 
-            if (visualChild != null) visualOriginalPos = visualChild.localPosition;
+            visualChild = spriteVisual != null ? spriteVisual.transform : transform;
+            visualOriginalPos = visualChild.localPosition;
         }
+
+        public void SetupVisualForArchetype()
+        {
+            ApplyArchetype();
+        }
+
+#if UNITY_EDITOR
+        private static Sprite LoadFirstSprite(string path)
+        {
+            var assets = UnityEditor.AssetDatabase.LoadAllAssetsAtPath(path);
+            foreach (var a in assets)
+            {
+                if (a is Sprite s) return s;
+            }
+            return null;
+        }
+#endif
 
         private void Update()
         {
@@ -197,13 +302,7 @@ namespace CodeForge.Combat
             Transform vTr = visualChild != null ? visualChild : transform;
             Vector3 basePos = visualChild != null ? visualOriginalPos : originalLocalPos;
 
-            if (CurrentIntent.intentType == EnemyIntentType.Charge && !IsDead && !isLunging)
-            {
-                float shakeX = (Mathf.PerlinNoise(Time.time * 30f, 0f) - 0.5f) * 0.12f;
-                float shakeY = (Mathf.PerlinNoise(0f, Time.time * 30f) - 0.5f) * 0.12f;
-                vTr.localPosition = basePos + new Vector3(shakeX, shakeY, 0f);
-            }
-            else if (!isLunging && vTr.localPosition != basePos)
+            if (!isLunging && vTr.localPosition != basePos)
             {
                 vTr.localPosition = basePos;
             }
@@ -218,6 +317,8 @@ namespace CodeForge.Combat
             gameObject.SetActive(true);
             SetupVisualForArchetype();
             EnsureIntentPlateUI();
+            var healthBar = GetComponentInChildren<EnemyHealthBarUI>(true);
+            if (healthBar != null) healthBar.BindEntity(this);
             RollNextIntent(1);
         }
 
@@ -230,41 +331,64 @@ namespace CodeForge.Combat
 
         private void EnsureIntentPlateUI()
         {
+            var canvas = GetComponentInChildren<Canvas>(true);
+            if (canvas != null)
+            {
+                canvas.overrideSorting = true;
+                canvas.sortingOrder = 20;
+            }
+
             var plate = GetComponentInChildren<EnemyIntentPlateUI>(true);
             if (plate == null)
             {
-                var canvas = GetComponentInChildren<Canvas>(true);
                 if (canvas != null)
                 {
-                    var plateObj = new GameObject("EnemyIntentPlate", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image), typeof(EnemyIntentPlateUI));
-                    plateObj.transform.SetParent(canvas.transform, false);
+                    Transform existingPlateTr = canvas.transform.Find("EnemyIntentPlate");
+                    GameObject plateObj = existingPlateTr != null ? existingPlateTr.gameObject : null;
+                    if (plateObj == null)
+                    {
+                        plateObj = new GameObject("EnemyIntentPlate", typeof(RectTransform), typeof(CanvasRenderer), typeof(UnityEngine.UI.Image), typeof(EnemyIntentPlateUI));
+                        plateObj.transform.SetParent(canvas.transform, false);
 
-                    var rect = plateObj.GetComponent<RectTransform>();
-                    rect.anchorMin = new Vector2(0.5f, 1f);
-                    rect.anchorMax = new Vector2(0.5f, 1f);
-                    rect.pivot = new Vector2(0.5f, 0f);
-                    rect.anchoredPosition = new Vector2(0f, 6f);
-                    rect.sizeDelta = new Vector2(130f, 24f);
+                        var rect = plateObj.GetComponent<RectTransform>();
+                        rect.anchorMin = new Vector2(0.5f, 1f);
+                        rect.anchorMax = new Vector2(0.5f, 1f);
+                        rect.pivot = new Vector2(0.5f, 0f);
+                        rect.anchoredPosition = new Vector2(0f, 6f);
+                        rect.sizeDelta = new Vector2(145f, 28f);
 
-                    var bgImg = plateObj.GetComponent<UnityEngine.UI.Image>();
-                    bgImg.color = new Color(0.12f, 0.12f, 0.16f, 0.85f);
-
-                    var textObj = new GameObject("IntentText", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
-                    textObj.transform.SetParent(plateObj.transform, false);
-
-                    var textRect = textObj.GetComponent<RectTransform>();
-                    textRect.anchorMin = Vector2.zero;
-                    textRect.anchorMax = Vector2.one;
-                    textRect.sizeDelta = Vector2.zero;
-
-                    var tmp = textObj.GetComponent<TMPro.TextMeshProUGUI>();
-                    tmp.alignment = TMPro.TextAlignmentOptions.Center;
-                    tmp.fontSize = 12f;
-                    tmp.color = Color.white;
-                    tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+                        var bgImg = plateObj.GetComponent<UnityEngine.UI.Image>();
+                        bgImg.color = new Color(0.12f, 0.12f, 0.16f, 0.85f);
+                    }
 
                     plate = plateObj.GetComponent<EnemyIntentPlateUI>();
-                    plate.InitializeAtRuntime(this, tmp, bgImg);
+                    if (plate == null) plate = plateObj.AddComponent<EnemyIntentPlateUI>();
+
+                    Transform existingTextTr = plateObj.transform.Find("IntentText");
+                    TMPro.TextMeshProUGUI tmp = existingTextTr != null ? existingTextTr.GetComponent<TMPro.TextMeshProUGUI>() : null;
+                    if (tmp == null)
+                    {
+                        var textObj = new GameObject("IntentText", typeof(RectTransform), typeof(TMPro.TextMeshProUGUI));
+                        textObj.transform.SetParent(plateObj.transform, false);
+
+                        var textRect = textObj.GetComponent<RectTransform>();
+                        textRect.anchorMin = Vector2.zero;
+                        textRect.anchorMax = Vector2.one;
+                        textRect.sizeDelta = Vector2.zero;
+
+                        tmp = textObj.GetComponent<TMPro.TextMeshProUGUI>();
+                        tmp.alignment = TMPro.TextAlignmentOptions.Center;
+                        tmp.fontSize = 16f;
+                        tmp.color = Color.white;
+                        tmp.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+#if UNITY_EDITOR
+                        var font = UnityEditor.AssetDatabase.LoadAssetAtPath<TMPro.TMP_FontAsset>("Assets/Fonts/BoldPixels_SDF.asset");
+                        if (font != null) tmp.font = font;
+#endif
+                    }
+
+                    var bg = plateObj.GetComponent<UnityEngine.UI.Image>();
+                    plate.InitializeAtRuntime(this, tmp, bg);
                 }
             }
             else
@@ -284,6 +408,7 @@ namespace CodeForge.Combat
                     break;
 
                 case EnemyArchetype.Skeleton:
+                case EnemyArchetype.ShieldBeetle:
                     // Odd turns: Shield 12, Even turns: Attack contactDamage (default 6)
                     if (turn % 2 == 1)
                         nextIntent = new EnemyIntent(EnemyIntentType.Shield, 12);
@@ -291,14 +416,11 @@ namespace CodeForge.Combat
                         nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 6f));
                     break;
 
-                case EnemyArchetype.GlassCannon:
-                    nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 9f));
-                    break;
-
                 case EnemyArchetype.SlimeTank:
                     nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 4f));
                     break;
 
+                case EnemyArchetype.StoneGolem:
                 case EnemyArchetype.GolemCharger:
                     // Turns 1 & 2: Charge, Turn 3: Heavy contactDamage (default 18)
                     int cycle = ((turn - 1) % 3) + 1;
@@ -308,8 +430,25 @@ namespace CodeForge.Combat
                         nextIntent = new EnemyIntent(EnemyIntentType.Charge, 0);
                     break;
 
+                case EnemyArchetype.DemonicEye:
+                case EnemyArchetype.Default:
+                case EnemyArchetype.GlitchBug:
+                case EnemyArchetype.GlassCannon:
+                case EnemyArchetype.SyntaxGlitch:
+                    // Odd turns: [DEBUFF] (reduces player damage multiplier by 0.2x). Even turns: [ATK contactDamage] (default 6).
+                    if (turn % 2 == 1)
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Debuff, 1);
+                    }
+                    else
+                    {
+                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 6f));
+                    }
+                    break;
+
+                case EnemyArchetype.Vampire:
                 case EnemyArchetype.MemoryLeak:
-                    // Turn % 3 == 0: Buff +2 DMG permanently. Otherwise Attack with contactDamage (starts at 5).
+                    // Turn > 1 && Turn % 3 == 0: Buff +2 DMG permanently. Otherwise Attack with contactDamage (starts at 5-6).
                     if (turn > 1 && turn % 3 == 0)
                     {
                         nextIntent = new EnemyIntent(EnemyIntentType.Buff, 2);
@@ -320,32 +459,8 @@ namespace CodeForge.Combat
                     }
                     break;
 
-                case EnemyArchetype.SyntaxGlitch:
-                    // Odd turns: [DEBUFF] (reduces player damage multiplier by 0.2x). Even turns: [ATK contactDamage] (default 8).
-                    if (turn % 2 == 1)
-                    {
-                        nextIntent = new EnemyIntent(EnemyIntentType.Debuff, 1);
-                    }
-                    else
-                    {
-                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 8f));
-                    }
-                    break;
-
                 default:
-                    if (turn > 1 && turn % 3 == 0)
-                    {
-                        int heavyDmg = Mathf.RoundToInt(contactDamage * 1.8f);
-                        nextIntent = new EnemyIntent(EnemyIntentType.HeavyHit, heavyDmg);
-                    }
-                    else if (turn > 1 && turn % 2 == 0 && HealthPercent < 0.7f && CurrentShield == 0)
-                    {
-                        nextIntent = new EnemyIntent(EnemyIntentType.Shield, 8);
-                    }
-                    else
-                    {
-                        nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage));
-                    }
+                    nextIntent = new EnemyIntent(EnemyIntentType.Attack, Mathf.RoundToInt(contactDamage > 0f ? contactDamage : 5f));
                     break;
             }
 
@@ -381,10 +496,10 @@ namespace CodeForge.Combat
 
                         float hpLost = Mathf.Max(0f, hpBefore - target.CurrentHp);
 
-                        if (archetype == EnemyArchetype.MemoryLeak && hpLost > 0f)
+                        if ((archetype == EnemyArchetype.Vampire || archetype == EnemyArchetype.MemoryLeak) && hpLost > 0f)
                         {
                             Heal(hpLost);
-                            ConsoleLogUI.Log($"<color=#98C379>[Enemy] MemoryLeak absorbed {hpLost:0} HP from Player! Healed +{hpLost:0} HP.</color>");
+                            ConsoleLogUI.Log($"<color=#98C379>[Enemy] Vampire absorbed {hpLost:0} HP from Player! Healed +{hpLost:0} HP.</color>");
                         }
 
                         if (target is PlayerCombatController playerCombat && !playerCombat.IsDead)
@@ -434,7 +549,7 @@ namespace CodeForge.Combat
                     if (target is PlayerCombatController player)
                     {
                         player.DamageMultiplier = Mathf.Max(0.2f, player.DamageMultiplier - 0.2f);
-                        ConsoleLogUI.Log($"<color=#C678DD>[Enemy] {gameObject.name} injected a Syntax Glitch! Player Damage Multiplier reduced by 0.2x (Now: {player.DamageMultiplier:0.0#}x)!</color>");
+                        ConsoleLogUI.Log($"<color=#C678DD>[Enemy] {gameObject.name} inflicted an Evil Glare! Player Damage Multiplier reduced by 0.2x (Now: {player.DamageMultiplier:0.0#}x)!</color>");
                     }
                     yield return new WaitForSeconds(0.25f);
                     break;

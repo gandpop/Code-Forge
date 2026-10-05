@@ -21,6 +21,11 @@ namespace CodeForge.Combat
         [SerializeField] private Transform enemySpawnContainer;
         [SerializeField] private GameObject enemyPrefab;
 
+        [Header("Enemy Spawn Points (Adjust in Scene View)")]
+        [SerializeField] private Transform slot1SpawnPoint;
+        [SerializeField] private Transform slot2SpawnPoint;
+        [SerializeField] private Transform slot3SpawnPoint;
+
         [Header("UI Controllers")]
         [SerializeField] private CodeEditorPanelUI codeEditorUI;
         [SerializeField] private RewardPanelUI rewardPanelUI;
@@ -104,12 +109,12 @@ namespace CodeForge.Combat
             {
                 1 => "Room 1: 'Hello World' (ExecuteTurn Method)",
                 2 => "Room 2: 'The Variable Forge' (Class Fields)",
-                3 => "Room 3: 'The Reaction Test' (OnTakeDamage Callback)",
-                4 => "Room 4: 'Double Threat' (Slime Tank & Glass Cannon)",
-                5 => "Room 5: 'Syntax Error' (Syntax Glitch & Skeleton Elite)",
-                6 => "Room 6: 'Swarm Routine' (Glitch Minion, Skeleton & Slime Boss)",
-                7 => "Room 7: 'Memory Corruption' (Syntax Glitch, Memory Leak & Golem Elite)",
-                8 => "Room 8: 'The Core Golem' (Golem Boss & Skeletons)",
+                3 => "Room 3: 'The Heavy Threat' (Stone Golem Charge)",
+                4 => "Room 4: 'Double Threat' (Slime Tank & Demonic Eye)",
+                5 => "Room 5: 'Dark Synergy' (Skeleton & Vampire)",
+                6 => "Room 6: 'Swarm Routine' (Demonic Eyes & Slime Tank Boss)",
+                7 => "Room 7: 'Elite Trial' (Skeleton, Vampire & Stone Golem Elite)",
+                8 => "Room 8: 'The Core Golem' (Skeleton Guard, Vampire Thrall & Golem Boss)",
                 _ => $"Room {currentRoomIndex}: Scaling Dungeon"
             };
 
@@ -294,25 +299,15 @@ namespace CodeForge.Combat
             int enemyCount = 1;
             if (room <= 3) enemyCount = 1;
             else if (room <= 5) enemyCount = 2;
-            else enemyCount = 3;
+            else if (room <= 8) enemyCount = 3;
+            else
+            {
+                var rngCheck = new System.Random(room * 7919);
+                enemyCount = rngCheck.NextDouble() < 0.40 ? 2 : 3;
+            }
 
             var platforms = GameObject.Find("ArenaPlatforms");
-            if (platforms != null)
-            {
-                var playerPed = platforms.transform.Find("Pedestal_Player");
-                if (playerPed != null)
-                {
-                    playerPed.gameObject.SetActive(true);
-                }
-
-                var ped1 = platforms.transform.Find("Pedestal_Enemy_1") ?? platforms.transform.Find("Pedestal_Enemy_Single");
-                var ped2 = platforms.transform.Find("Pedestal_Enemy_2") ?? platforms.transform.Find("Pedestal_Enemy_Left");
-                var ped3 = platforms.transform.Find("Pedestal_Enemy_3") ?? platforms.transform.Find("Pedestal_Enemy_Right");
-
-                if (ped1 != null) ped1.gameObject.SetActive(enemyCount >= 1);
-                if (ped2 != null) ped2.gameObject.SetActive(enemyCount >= 2);
-                if (ped3 != null) ped3.gameObject.SetActive(enemyCount >= 3);
-            }
+            if (platforms != null) platforms.SetActive(false);
 
             if (player != null && playerInitialCaptured)
             {
@@ -334,64 +329,73 @@ namespace CodeForge.Combat
                     break;
 
                 case 3:
-                    // Room 3: 1x Golem Charger (45 HP, 18 DMG Heavy)
-                    SpawnEnemy("Golem_Charger", 1, 45f, 18f, EnemyArchetype.GolemCharger);
+                    // Room 3: 1x Stone Golem (45 HP, 18 DMG Heavy)
+                    SpawnEnemy("Stone_Golem", 1, 45f, 18f, EnemyArchetype.StoneGolem);
                     break;
 
                 case 4:
-                    // Room 4: 2 Enemies — Slime Tank (Frontline) + Glass Cannon (Midline)
+                    // Room 4: 2 Enemies — Slime Tank (Slot 1) + Demonic Eye (Slot 2)
                     SpawnEnemy("Slime_Tank", 1, 30f, 4f, EnemyArchetype.SlimeTank);
-                    SpawnEnemy("Glass_Cannon", 2, 20f, 9f, EnemyArchetype.GlassCannon);
+                    SpawnEnemy("Demonic_Eye", 2, 22f, 6f, EnemyArchetype.DemonicEye);
                     break;
 
                 case 5:
-                    // Room 5: 2 Enemies — Syntax Glitch (Frontline) + Skeleton Elite (Midline)
-                    SpawnEnemy("Syntax_Glitch", 1, 28f, 8f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Skeleton_Elite", 2, 35f, 7f, EnemyArchetype.Skeleton);
+                    // Room 5: 2 Enemies — Skeleton (Slot 1) + Vampire (Slot 2)
+                    SpawnEnemy("Skeleton", 1, 32f, 6f, EnemyArchetype.Skeleton);
+                    SpawnEnemy("Vampire", 2, 28f, 5f, EnemyArchetype.Vampire);
                     break;
 
                 case 6:
-                    // Room 6: 3 Enemies — Glitch Minion (Frontline) + Skeleton (Midline) + Slime Tank Boss (Backline)
-                    SpawnEnemy("Glitch_Minion", 1, 16f, 3f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Skeleton", 2, 25f, 5f, EnemyArchetype.Skeleton);
-                    SpawnEnemy("Slime_Tank_Boss", 3, 40f, 6f, EnemyArchetype.SlimeTank);
+                    // Room 6: 3 Enemies — Demonic Eye A (Slot 1) + Demonic Eye B (Slot 2) + Slime Tank Boss (Slot 3)
+                    SpawnEnemy("Demonic_Eye_A", 1, 20f, 5f, EnemyArchetype.DemonicEye);
+                    SpawnEnemy("Demonic_Eye_B", 2, 20f, 5f, EnemyArchetype.DemonicEye);
+                    SpawnEnemy("Slime_Tank_Boss", 3, 45f, 6f, EnemyArchetype.SlimeTank);
                     break;
 
                 case 7:
-                    // Room 7: 3 Enemies — Syntax Glitch (Frontline) + Memory Leak (Midline) + Golem Elite (Backline)
-                    SpawnEnemy("Syntax_Glitch", 1, 24f, 6f, EnemyArchetype.SyntaxGlitch);
-                    SpawnEnemy("Memory_Leak", 2, 35f, 6f, EnemyArchetype.MemoryLeak);
-                    SpawnEnemy("Golem_Elite", 3, 50f, 16f, EnemyArchetype.GolemCharger);
+                    // Room 7: 3 Enemies — Skeleton (Slot 1) + Vampire (Slot 2) + Stone Golem Elite (Slot 3)
+                    SpawnEnemy("Skeleton", 1, 32f, 6f, EnemyArchetype.Skeleton);
+                    SpawnEnemy("Vampire", 2, 30f, 6f, EnemyArchetype.Vampire);
+                    SpawnEnemy("Stone_Golem_Elite", 3, 55f, 18f, EnemyArchetype.StoneGolem);
                     break;
 
                 case 8:
-                    // Room 8: 3 Enemies — Skeleton (Frontline) + Skeleton (Midline) + Golem Boss (Backline)
-                    SpawnEnemy("Skeleton_Front", 1, 30f, 5f, EnemyArchetype.Skeleton);
-                    SpawnEnemy("Skeleton_Mid", 2, 30f, 5f, EnemyArchetype.Skeleton);
-                    SpawnEnemy("Golem_Boss", 3, 65f, 16f, EnemyArchetype.GolemCharger);
+                    // Room 8: 3 Enemies (Boss) — Skeleton Guard (Slot 1) + Vampire Thrall (Slot 2) + Stone Golem Boss (Slot 3)
+                    SpawnEnemy("Skeleton_Guard", 1, 35f, 6f, EnemyArchetype.Skeleton);
+                    SpawnEnemy("Vampire_Thrall", 2, 32f, 6f, EnemyArchetype.Vampire);
+                    SpawnEnemy("Stone_Golem_Boss", 3, 70f, 20f, EnemyArchetype.StoneGolem);
                     break;
 
                 default:
-                    // Room 9+: Dynamic rotating 3-enemy compositions with progressive scaling
-                    float scale = 1f + (room - 8) * 0.12f;
-                    int cycle = (room - 9) % 3;
-                    if (cycle == 0)
+                    // Room 9+: Dynamic Scaling Endless Mode
+                    // 40% 2 enemies, 60% 3 enemies from the 5 surviving archetypes
+                    var rng = new System.Random(room * 7919);
+                    bool isTwoEnemies = rng.NextDouble() < 0.40;
+                    int count = isTwoEnemies ? 2 : 3;
+                    float scale = 1f + (room - 8) * 0.15f;
+
+                    // Slot 1 prefers SlimeTank / Skeleton / DemonicEye
+                    EnemyArchetype[] slot1Pool = { EnemyArchetype.SlimeTank, EnemyArchetype.Skeleton, EnemyArchetype.DemonicEye };
+                    EnemyArchetype a1 = slot1Pool[rng.Next(slot1Pool.Length)];
+                    float baseHp1 = a1 == EnemyArchetype.SlimeTank ? 35f : (a1 == EnemyArchetype.Skeleton ? 32f : 24f);
+                    float baseDmg1 = a1 == EnemyArchetype.SlimeTank ? 5f : 6f;
+                    SpawnEnemy($"{a1}_R{room}", 1, Mathf.Round(baseHp1 * scale), Mathf.Round(baseDmg1 * scale), a1);
+
+                    // Slot 2 prefers DemonicEye / Skeleton / Vampire
+                    EnemyArchetype[] slot2Pool = { EnemyArchetype.DemonicEye, EnemyArchetype.Skeleton, EnemyArchetype.Vampire };
+                    EnemyArchetype a2 = slot2Pool[rng.Next(slot2Pool.Length)];
+                    float baseHp2 = a2 == EnemyArchetype.DemonicEye ? 24f : (a2 == EnemyArchetype.Skeleton ? 32f : 30f);
+                    float baseDmg2 = 6f;
+                    SpawnEnemy($"{a2}_R{room}", 2, Mathf.Round(baseHp2 * scale), Mathf.Round(baseDmg2 * scale), a2);
+
+                    // Slot 3 prefers StoneGolem / SlimeTank
+                    if (count >= 3)
                     {
-                        SpawnEnemy($"Syntax_Glitch_R{room}", 1, 26f * scale, 6f * scale, EnemyArchetype.SyntaxGlitch);
-                        SpawnEnemy($"Memory_Leak_R{room}", 2, 36f * scale, 6f * scale, EnemyArchetype.MemoryLeak);
-                        SpawnEnemy($"Golem_Charger_R{room}", 3, 50f * scale, 16f * scale, EnemyArchetype.GolemCharger);
-                    }
-                    else if (cycle == 1)
-                    {
-                        SpawnEnemy($"Skeleton_1_R{room}", 1, 28f * scale, 5f * scale, EnemyArchetype.Skeleton);
-                        SpawnEnemy($"Skeleton_2_R{room}", 2, 28f * scale, 5f * scale, EnemyArchetype.Skeleton);
-                        SpawnEnemy($"Golem_Boss_R{room}", 3, 60f * scale, 18f * scale, EnemyArchetype.GolemCharger);
-                    }
-                    else
-                    {
-                        SpawnEnemy($"Glass_Cannon_1_R{room}", 1, 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
-                        SpawnEnemy($"Glass_Cannon_2_R{room}", 2, 20f * scale, 8f * scale, EnemyArchetype.GlassCannon);
-                        SpawnEnemy($"Slime_Tank_Boss_R{room}", 3, 45f * scale, 6f * scale, EnemyArchetype.SlimeTank);
+                        EnemyArchetype[] slot3Pool = { EnemyArchetype.StoneGolem, EnemyArchetype.SlimeTank };
+                        EnemyArchetype a3 = slot3Pool[rng.Next(slot3Pool.Length)];
+                        float baseHp3 = a3 == EnemyArchetype.StoneGolem ? 55f : 45f;
+                        float baseDmg3 = a3 == EnemyArchetype.StoneGolem ? 18f : 6f;
+                        SpawnEnemy($"{a3}_Boss_R{room}", 3, Mathf.Round(baseHp3 * scale), Mathf.Round(baseDmg3 * scale), a3);
                     }
                     break;
             }
@@ -399,37 +403,65 @@ namespace CodeForge.Combat
 
         public static Vector3 GetSlotPosition(int slotIndex)
         {
-            var platforms = GameObject.Find("ArenaPlatforms");
-            if (platforms != null)
+            if (Instance != null)
             {
-                string pedName = slotIndex switch
+                Transform spawnPoint = slotIndex switch
                 {
-                    1 => "Pedestal_Enemy_1",
-                    2 => "Pedestal_Enemy_2",
-                    3 => "Pedestal_Enemy_3",
-                    _ => "Pedestal_Enemy_1"
+                    1 => Instance.slot1SpawnPoint,
+                    2 => Instance.slot2SpawnPoint,
+                    3 => Instance.slot3SpawnPoint,
+                    _ => Instance.slot1SpawnPoint
                 };
-                var ped = platforms.transform.Find(pedName) ??
-                          platforms.transform.Find(slotIndex == 1 ? "Pedestal_Enemy_Single" : (slotIndex == 2 ? "Pedestal_Enemy_Left" : "Pedestal_Enemy_Right"));
-                if (ped != null)
+
+                if (spawnPoint != null)
                 {
-                    // Spawn directly on top of the pedestal
-                    return new Vector3(ped.position.x, ped.position.y + 0.70f, 0f);
+                    return spawnPoint.position;
                 }
             }
 
             return slotIndex switch
             {
-                1 => new Vector3(3.12f, -1.20f, 0f),
-                2 => new Vector3(-2.30f, 0.72f, 0f),
-                3 => new Vector3(2.09f, 1.94f, 0f),
-                _ => new Vector3(3.12f, -1.20f, 0f)
+                1 => new Vector3(3.40f, -1.60f, 0f),
+                2 => new Vector3(-0.60f, 0.40f, 0f),
+                3 => new Vector3(2.20f, 1.80f, 0f),
+                _ => new Vector3(3.40f, -1.60f, 0f)
             };
         }
 
+#if UNITY_EDITOR
+        private void OnDrawGizmos()
+        {
+            DrawSlotGizmo(slot1SpawnPoint, 1, new Color(0.2f, 1f, 0.4f, 0.8f));
+            DrawSlotGizmo(slot2SpawnPoint, 2, new Color(0.3f, 0.8f, 1f, 0.8f));
+            DrawSlotGizmo(slot3SpawnPoint, 3, new Color(1f, 0.4f, 0.8f, 0.8f));
+        }
+
+        private void DrawSlotGizmo(Transform spawnPoint, int slot, Color col)
+        {
+            Vector3 pos = spawnPoint != null ? spawnPoint.position : GetSlotPosition(slot);
+            Gizmos.color = col;
+            Gizmos.DrawWireSphere(pos, 0.35f);
+            UnityEditor.Handles.color = col;
+            UnityEditor.Handles.Label(pos + Vector3.up * 0.45f, $"Slot {slot} ({(spawnPoint != null ? spawnPoint.name : "Default")})");
+        }
+
+        [ContextMenu("Clear Scene Enemies")]
+        public void ClearSceneEnemies()
+        {
+            if (enemySpawnContainer != null)
+            {
+                while (enemySpawnContainer.childCount > 0)
+                {
+                    DestroyImmediate(enemySpawnContainer.GetChild(0).gameObject);
+                }
+            }
+            activeEnemies.Clear();
+        }
+#endif
+
         public static Vector3 GetSlotScale(int slotIndex) => new Vector3(1.0f, 1.0f, 1.0f);
 
-        private void SpawnEnemy(string name, int slotIndex, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
+        private void SpawnEnemy(string name, int slotIndex, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.DemonicEye)
         {
             GameObject obj = Instantiate(enemyPrefab, enemySpawnContainer);
             obj.name = name;
@@ -449,7 +481,7 @@ namespace CodeForge.Combat
             }
         }
 
-        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.Default)
+        private void SpawnEnemy(string name, Vector3 localPos, float hp, float dmg, EnemyArchetype archetype = EnemyArchetype.DemonicEye)
         {
             SpawnEnemy(name, 1, hp, dmg, archetype);
             if (activeEnemies.Count > 0)
