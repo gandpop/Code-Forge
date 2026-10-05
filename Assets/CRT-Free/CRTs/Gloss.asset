@@ -19,9 +19,9 @@ MonoBehaviour:
       green: 0
       blue: 0
       greyScale: 0
-    dithering: 0
+    dithering4: 0
     dithering8: 0
-    vignette: 0.106
+    vignette: 0.049
     innerCurve: 4.7
     monitorCurve: 0
     monitorInnerSize:
@@ -42,4 +42,8 @@ MonoBehaviour:
       sizeMultiplier: 1
     innerMonitorShineRadius: -0.087
     innerMonitorShineCurve: 10
-  validationId: a4311eb3-fe9d-4ad1-a7c1-3fd6526738a2
+    showFrame: 0
+    scanlineCount: 280
+    scanlineIntensity: 0.22
+    scanlineSpeed: 0.6
+  validationId: 6a2902f8-21ce-4ede-950e-33c8e1ac19eb

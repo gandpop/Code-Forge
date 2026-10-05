@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BorderTex:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: a5e897f9f29eb488ba4791cd52d004b5, type: 3}
         m_Scale: {x: 3, y: 3}
         m_Offset: {x: 0, y: 0}
     - _BumpMap:
@@ -65,22 +65,22 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BorderInnerDarkerAmount: 0.853
+    - _BorderInnerDarkerAmount: 0.40399998
     - _BorderInnerSharpness: 0.8
     - _BorderInnerSizeX: 0
     - _BorderInnerSizeY: 0
     - _BorderOutterRound: 0.2
     - _BorderOutterSharpness: 0.814
-    - _BorderOutterSizeX: 0.063
-    - _BorderOutterSizeY: 0.076
-    - _BorderZoom: 0.5
+    - _BorderOutterSizeX: 0.096
+    - _BorderOutterSizeY: 0.1
+    - _BorderZoom: 1.31
     - _BottomStaticOpt: 0
     - _BumpScale: 1
-    - _CrtGlowAmount: 0.01
+    - _CrtGlowAmount: 0.25
     - _CrtReflectionCurve: 10
-    - _CrtReflectionFalloff: 0.254
+    - _CrtReflectionFalloff: 0
     - _CrtReflectionRadius: -0.087
-    - _Curvature: 0
+    - _Curvature: 4.7
     - _Curvature2: 0
     - _Cutoff: 0.5
     - _Desaturation: 0
@@ -106,18 +106,18 @@ Material:
     - _ShowFrame: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
-    - _Spread: 0.085
+    - _Spread: 0
     - _Spread8: 0
     - _SrcBlend: 1
     - _UVSec: 0
     - _VertJerkOpt: 1
     - _VertMovementOpt: 1
-    - _VigSize: 0.2
+    - _VigSize: 0.049
     - _ZWrite: 1
     m_Colors:
-    - _BorderTint: {r: 0.121796034, g: 0.12775578, b: 0.16037738, a: 1}
+    - _BorderTint: {r: 0.12867041, g: 0.1254902, b: 0.21568628, a: 0.5254902}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
-    - _ColorScans: {r: -0.332, g: -0.334, b: 3.94, a: 1}
+    - _ColorScans: {r: -0.048, g: 0.048, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
