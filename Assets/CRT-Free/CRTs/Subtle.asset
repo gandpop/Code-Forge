@@ -1,0 +1,49 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30f312d9f3f24cdb944c1453a1accefb, type: 3}
+  m_Name: Subtle
+  m_EditorClassIdentifier: 
+  data:
+    pixelationAmount: 174
+    maxColorChannels:
+      red: 0
+      green: 0
+      blue: 0
+      greyScale: 0
+    dithering4: 0.085
+    dithering8: 0
+    vignette: 0.2
+    innerCurve: 0
+    monitorCurve: 0
+    monitorInnerSize:
+      width: 0
+      height: 0
+    monitorOutterSize:
+      width: 0.063
+      height: 0.076
+    zoom: 0.5
+    monitorRoundness: 0.2
+    monitorTexture: {fileID: 0}
+    monitorColor: {r: 0.121796034, g: 0.12775578, b: 0.16037738, a: 1}
+    innerMonitorDarkness: 0.147
+    innerMonitorShine: 0.01
+    colorScans:
+      greenChannelMultiplier: -0.332
+      redBlueChannelMultiplier: -0.334
+      sizeMultiplier: 3.94
+    innerMonitorShineRadius: -0.087
+    innerMonitorShineCurve: 10
+    showFrame: 0
+    scanlineCount: 280
+    scanlineIntensity: 0.22
+    scanlineSpeed: 0.6
+  validationId: 144dbced-4287-4502-8e35-343d69dc8565
