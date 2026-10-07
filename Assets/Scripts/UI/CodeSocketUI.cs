@@ -91,6 +91,19 @@ namespace CodeForge.UI
 
         public void OnPointerEnter(PointerEventData eventData)
         {
+            if (eventData.dragging)
+            {
+                var draggedCard = eventData.pointerDrag?.GetComponent<DraggableTokenCardUI>();
+                if (draggedCard != null && draggedCard.Token != null && socketOutline != null)
+                {
+                    bool compatible = IsTypeCompatible(draggedCard.Token.tokenType, expectedType);
+                    socketOutline.enabled = true;
+                    socketOutline.effectColor = compatible ? new Color(0.2f, 0.9f, 0.3f, 1f) : new Color(0.95f, 0.25f, 0.25f, 0.95f);
+                    socketOutline.effectDistance = new Vector2(2f, -2f);
+                    return;
+                }
+            }
+
             if (!isHighlightActive && socketOutline != null)
             {
                 socketOutline.enabled = true;

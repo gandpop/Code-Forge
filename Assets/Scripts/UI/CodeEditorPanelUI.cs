@@ -194,7 +194,10 @@ namespace CodeForge.UI
             UpdateChanceRowDisplays();
             EnsureScrollPadding();
             EnsureShelfHeaderLabel();
+            EnsureShelfDiscardSlot();
+            EnsureHighContrastScrollbars();
             SetupAllMethodFolding();
+            UpdateRoomMethodUnlocks(CombatManager.Instance != null ? CombatManager.Instance.CurrentRoomIndex : 1);
         }
 
         public void EnsureAllSockets()
@@ -858,7 +861,10 @@ namespace CodeForge.UI
             EnsureScrollPadding();
             EnsureInventoryScrollSensitivity();
             EnsureShelfSortChip();
+            EnsureShelfDiscardSlot();
+            EnsureHighContrastScrollbars();
             ApplyInventorySort();
+            UpdateRoomMethodUnlocks(CombatManager.Instance != null ? CombatManager.Instance.CurrentRoomIndex : 1);
         }
 
         public void EnsureInventoryScrollSensitivity()
@@ -888,6 +894,27 @@ namespace CodeForge.UI
         public void PrePopulateDefaultTokens()
         {
             SlotDefaultIfEmpty(MaxHealthSocketUI, defaultMaxHealth);
+
+            if (defaultAttackDamage == null)
+            {
+                var allTokens = Resources.FindObjectsOfTypeAll<CodeTokenSO>();
+                foreach (var t in allTokens)
+                {
+                    if (t != null && t.name == "Int_8")
+                    {
+                        defaultAttackDamage = t;
+                        break;
+                    }
+                }
+#if UNITY_EDITOR
+                if (defaultAttackDamage == null)
+                {
+                    defaultAttackDamage = UnityEditor.AssetDatabase.LoadAssetAtPath<CodeTokenSO>("Assets/ScriptableObjects/Tokens/Int_8.asset");
+                }
+#endif
+            }
+
+            SlotDefaultIfEmpty(attackDamageSocket, defaultAttackDamage);
         }
 
         private void SlotDefaultIfEmpty(CodeSocketUI socket, CodeTokenSO defaultToken)
@@ -1695,7 +1722,7 @@ namespace CodeForge.UI
             }
             if (shelfHeaderText != null)
             {
-                shelfHeaderText.text = "// Token Inventory Shelf (Click to inspect • Drag to socket)";
+                shelfHeaderText.text = "// Token Inventory Shelf (Click to inspect | Drag to socket)";
             }
         }
 
@@ -1841,6 +1868,271 @@ namespace CodeForge.UI
                 }
             }
             return sb.ToString();
+        }
+
+        private HashSet<string> loggedUnlocks = new HashSet<string>();
+
+        public void UpdateRoomMethodUnlocks(int currentRoom)
+        {
+            SetupAllMethodFolding();
+
+            EditorLineRowUI attackRow = FindMethodRow("void Attack");
+            EditorLineRowUI defendRow = FindMethodRow("void Defend");
+            EditorLineRowUI executeTurnRow = FindMethodRow("void ExecuteTurn");
+            EditorLineRowUI reactionRow = FindMethodRow("void OnTakeDamage");
+
+            if (currentRoom <= 1)
+            {
+                // Room 1: Only ExecuteTurn() is unlocked. Defend() is locked (🔒 Unlocks in Room 2), OnTakeDamage() is locked (🔒 Unlocks in Room 3). Helper methods (Attack) are folded.
+                executeTurnRow?.SetLocked(false, null);
+                executeTurnRow?.SetFolded(false);
+
+                attackRow?.SetFolded(true);
+
+                defendRow?.SetLocked(true, "Unlocks in Room 2");
+                reactionRow?.SetLocked(true, "Unlocks in Room 3");
+            }
+            else if (currentRoom == 2)
+            {
+                // Room 2: Defend() unlocks!
+                if (defendRow != null)
+                {
+                    bool wasLocked = defendRow.isLocked;
+                    defendRow.SetLocked(false, null);
+                    if (wasLocked && !loggedUnlocks.Contains("Defend"))
+                    {
+                        loggedUnlocks.Add("Defend");
+                        ConsoleLogUI.Log("<color=#98C379>[Unlock] Defend() method unlocked in PlayerCombat.cs!</color>");
+                    }
+                }
+                reactionRow?.SetLocked(true, "Unlocks in Room 3");
+            }
+            else // currentRoom >= 3
+            {
+                // Room 3+: Both Defend() and OnTakeDamage() are unlocked!
+                if (defendRow != null)
+                {
+                    bool wasLocked = defendRow.isLocked;
+                    defendRow.SetLocked(false, null);
+                    if (wasLocked && !loggedUnlocks.Contains("Defend"))
+                    {
+                        loggedUnlocks.Add("Defend");
+                        ConsoleLogUI.Log("<color=#98C379>[Unlock] Defend() method unlocked in PlayerCombat.cs!</color>");
+                    }
+                }
+
+                if (reactionRow != null)
+                {
+                    bool wasLocked = reactionRow.isLocked;
+                    reactionRow.SetLocked(false, null);
+                    if (wasLocked && !loggedUnlocks.Contains("OnTakeDamage"))
+                    {
+                        loggedUnlocks.Add("OnTakeDamage");
+                        ConsoleLogUI.Log("<color=#98C379>[Unlock] OnTakeDamage() reaction callback unlocked!</color>");
+                    }
+                }
+            }
+        }
+
+        private EditorLineRowUI FindMethodRow(string methodSignature)
+        {
+            if (lineRows.Count == 0) CacheLineRows();
+            foreach (var kvp in lineRows)
+            {
+                if (kvp.Value != null)
+                {
+                    string txt = GetRowFullText(kvp.Value);
+                    string clean = System.Text.RegularExpressions.Regex.Replace(txt, "<.*?>", string.Empty);
+                    if (clean.Contains(methodSignature)) return kvp.Value;
+                }
+            }
+
+            var allRows = GetComponentsInChildren<EditorLineRowUI>(true);
+            foreach (var r in allRows)
+            {
+                if (r != null)
+                {
+                    string txt = GetRowFullText(r);
+                    string clean = System.Text.RegularExpressions.Regex.Replace(txt, "<.*?>", string.Empty);
+                    if (clean.Contains(methodSignature)) return r;
+                }
+            }
+            return null;
+        }
+
+        public void EnsureShelfDiscardSlot()
+        {
+            Transform panelTr = transform;
+            Transform invScrollTr = panelTr.Find("InventoryScroll");
+            if (invScrollTr == null) return;
+
+            var invRt = invScrollTr.GetComponent<RectTransform>();
+            if (invRt != null)
+            {
+                invRt.anchorMin = new Vector2(0.04f, 0.145f);
+                invRt.anchorMax = new Vector2(0.815f, 0.35f);
+                invRt.offsetMin = Vector2.zero;
+                invRt.offsetMax = Vector2.zero;
+            }
+
+            Transform existingSlot = panelTr.Find("ShelfDiscardSlot");
+            if (existingSlot == null)
+            {
+                GameObject slotObj = new GameObject("ShelfDiscardSlot", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline), typeof(ShelfDiscardSlotUI));
+                slotObj.transform.SetParent(panelTr, false);
+                slotObj.transform.SetSiblingIndex(invScrollTr.GetSiblingIndex() + 1);
+
+                var slotRt = slotObj.GetComponent<RectTransform>();
+                slotRt.anchorMin = new Vector2(0.825f, 0.145f);
+                slotRt.anchorMax = new Vector2(0.96f, 0.35f);
+                slotRt.offsetMin = Vector2.zero;
+                slotRt.offsetMax = Vector2.zero;
+
+                GameObject textObj = new GameObject("PromptText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                textObj.transform.SetParent(slotObj.transform, false);
+                var textRt = textObj.GetComponent<RectTransform>();
+                textRt.anchorMin = Vector2.zero;
+                textRt.anchorMax = Vector2.one;
+                textRt.offsetMin = Vector2.zero;
+                textRt.offsetMax = Vector2.zero;
+
+                var discardUI = slotObj.GetComponent<ShelfDiscardSlotUI>();
+                discardUI.Initialize();
+            }
+            else
+            {
+                var slotRt = existingSlot.GetComponent<RectTransform>();
+                slotRt.anchorMin = new Vector2(0.825f, 0.145f);
+                slotRt.anchorMax = new Vector2(0.96f, 0.35f);
+                slotRt.offsetMin = Vector2.zero;
+                slotRt.offsetMax = Vector2.zero;
+                var discardUI = existingSlot.GetComponent<ShelfDiscardSlotUI>();
+                if (discardUI != null) discardUI.Initialize();
+            }
+        }
+
+        public void EnsureHighContrastScrollbars()
+        {
+            Color trackBgColor = new Color(0.118f, 0.133f, 0.169f, 1f); // #1E222B, 100% alpha
+            Color handleColor = new Color(0.294f, 0.322f, 0.388f, 1f);  // #4B5263
+            Color highlightColor = new Color(0.380f, 0.686f, 0.937f, 1f); // #61AFEF
+
+            // 1. EditorScroll Vertical Scrollbar
+            Transform editorScrollTr = transform.Find("EditorScroll");
+            if (editorScrollTr != null)
+            {
+                var scrollRect = editorScrollTr.GetComponent<ScrollRect>();
+                if (scrollRect != null)
+                {
+                    Scrollbar vScrollbar = scrollRect.verticalScrollbar;
+                    if (vScrollbar == null)
+                    {
+                        var sbTr = editorScrollTr.Find("Scrollbar");
+                        if (sbTr != null) vScrollbar = sbTr.GetComponent<Scrollbar>();
+                    }
+
+                    if (vScrollbar != null)
+                    {
+                        var trackImg = vScrollbar.GetComponent<Image>();
+                        if (trackImg != null) trackImg.color = trackBgColor;
+
+                        var handleImg = vScrollbar.handleRect?.GetComponent<Image>();
+                        if (handleImg != null) handleImg.color = handleColor;
+
+                        var colors = vScrollbar.colors;
+                        colors.normalColor = handleColor;
+                        colors.highlightedColor = highlightColor;
+                        colors.pressedColor = highlightColor;
+                        colors.selectedColor = highlightColor;
+                        vScrollbar.colors = colors;
+
+                        var sbRt = vScrollbar.GetComponent<RectTransform>();
+                        if (sbRt != null && sbRt.sizeDelta.x < 10f)
+                        {
+                            sbRt.sizeDelta = new Vector2(10f, sbRt.sizeDelta.y);
+                        }
+                    }
+                }
+            }
+
+            // 2. InventoryScroll Horizontal Scrollbar
+            Transform invScrollTr = transform.Find("InventoryScroll");
+            if (invScrollTr != null)
+            {
+                var scrollRect = invScrollTr.GetComponent<ScrollRect>();
+                if (scrollRect != null)
+                {
+                    Scrollbar hScrollbar = scrollRect.horizontalScrollbar;
+                    if (hScrollbar == null)
+                    {
+                        var sbTr = invScrollTr.Find("Scrollbar_Horizontal");
+                        if (sbTr != null) hScrollbar = sbTr.GetComponent<Scrollbar>();
+                    }
+
+                    if (hScrollbar == null)
+                    {
+                        GameObject sbObj = new GameObject("Scrollbar_Horizontal", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Scrollbar));
+                        sbObj.transform.SetParent(invScrollTr, false);
+                        var sbRt = sbObj.GetComponent<RectTransform>();
+                        sbRt.anchorMin = new Vector2(0f, 0f);
+                        sbRt.anchorMax = new Vector2(1f, 0f);
+                        sbRt.pivot = new Vector2(0.5f, 0f);
+                        sbRt.offsetMin = new Vector2(0f, 0f);
+                        sbRt.offsetMax = new Vector2(0f, 10f);
+
+                        var trackImg = sbObj.GetComponent<Image>();
+                        trackImg.color = trackBgColor;
+
+                        GameObject slidingArea = new GameObject("Sliding Area", typeof(RectTransform));
+                        slidingArea.transform.SetParent(sbObj.transform, false);
+                        var saRt = slidingArea.GetComponent<RectTransform>();
+                        saRt.anchorMin = Vector2.zero;
+                        saRt.anchorMax = Vector2.one;
+                        saRt.offsetMin = Vector2.zero;
+                        saRt.offsetMax = Vector2.zero;
+
+                        GameObject handleObj = new GameObject("Handle", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image));
+                        handleObj.transform.SetParent(slidingArea.transform, false);
+                        var handleRt = handleObj.GetComponent<RectTransform>();
+                        handleRt.anchorMin = Vector2.zero;
+                        handleRt.anchorMax = Vector2.one;
+                        handleRt.offsetMin = Vector2.zero;
+                        handleRt.offsetMax = Vector2.zero;
+
+                        var handleImg = handleObj.GetComponent<Image>();
+                        handleImg.color = handleColor;
+
+                        hScrollbar = sbObj.GetComponent<Scrollbar>();
+                        hScrollbar.direction = Scrollbar.Direction.LeftToRight;
+                        hScrollbar.handleRect = handleRt;
+
+                        var colors = hScrollbar.colors;
+                        colors.normalColor = handleColor;
+                        colors.highlightedColor = highlightColor;
+                        colors.pressedColor = highlightColor;
+                        colors.selectedColor = highlightColor;
+                        hScrollbar.colors = colors;
+
+                        scrollRect.horizontalScrollbar = hScrollbar;
+                        scrollRect.horizontalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                    }
+                    else
+                    {
+                        var trackImg = hScrollbar.GetComponent<Image>();
+                        if (trackImg != null) trackImg.color = trackBgColor;
+
+                        var handleImg = hScrollbar.handleRect?.GetComponent<Image>();
+                        if (handleImg != null) handleImg.color = handleColor;
+
+                        var colors = hScrollbar.colors;
+                        colors.normalColor = handleColor;
+                        colors.highlightedColor = highlightColor;
+                        colors.pressedColor = highlightColor;
+                        colors.selectedColor = highlightColor;
+                        hScrollbar.colors = colors;
+                    }
+                }
+            }
         }
 
 #if UNITY_EDITOR

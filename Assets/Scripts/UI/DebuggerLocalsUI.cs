@@ -100,7 +100,7 @@ namespace CodeForge.UI
 
             if (titleText != null)
             {
-                titleText.text = $"<color=#E5C07B>● PAUSED AT BREAKPOINT</color> <color=#858585>|</color> Line {line:D2}";
+                titleText.text = $"<color=#E5C07B>[PAUSED AT BREAKPOINT]</color> <color=#858585>|</color> Line {line:D2}";
             }
 
             if (codeLineText != null)

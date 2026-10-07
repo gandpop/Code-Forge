@@ -82,8 +82,22 @@ namespace CodeForge.UI
                     _ => "var"
                 };
 
+                string plainName = !string.IsNullOrEmpty(Token.tokenName) ? Token.tokenName : typeName;
+                string syntax = Token.GetFormattedCodeString();
+
                 cardText.color = Color.white;
-                cardText.text = $"<size=75%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color></size> <color={typeColor}><b>{typeName}</b></color>\n<size=110%><b><color=#FFFFFF>{Token.GetFormattedCodeString()}</color></b></size>";
+                cardText.text = $"<size=85%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color> | <color={typeColor}><b>{typeName}</b></color></size>\n" +
+                                $"<size=120%><b><color=#FFFFFF>{plainName}</color></b></size>\n" +
+                                $"<size=92%><color=#98C379>{syntax}</color></size>";
+            }
+
+            var le = GetComponent<LayoutElement>();
+            if (le != null)
+            {
+                le.minHeight = 78f;
+                le.preferredHeight = 78f;
+                le.minWidth = 150f;
+                le.preferredWidth = 150f;
             }
 
             if (rarityBorder != null)

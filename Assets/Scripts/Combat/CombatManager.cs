@@ -34,6 +34,7 @@ namespace CodeForge.Combat
         private List<EnemyEntity> activeEnemies = new List<EnemyEntity>();
         public List<EnemyEntity> ActiveEnemies => activeEnemies;
         private int currentRoomIndex = 1;
+        public int CurrentRoomIndex => currentRoomIndex;
         private Coroutine combatCoroutine;
 
         private Vector3 playerInitialPos;
@@ -95,6 +96,7 @@ namespace CodeForge.Combat
             {
                 codeEditorUI.SetInteractionLocked(false);
                 codeEditorUI.ResetAllHighlights();
+                codeEditorUI.UpdateRoomMethodUnlocks(currentRoomIndex);
 
                 if (player != null)
                 {
@@ -183,7 +185,12 @@ namespace CodeForge.Combat
                     var elseToken = codeEditorUI != null ? codeEditorUI.GetElseActionToken() : null;
 
                     var context = new CombatContext(player, activeEnemies, null, round);
-                    yield return StartCoroutine(player.ExecuteTurnPipeline(context, codeEditorUI, targetToken, condToken, thenToken, elseToken));
+                    yield return StartCoroutine(ExecutePlayerTurnSafeguarded(context, codeEditorUI, targetToken, condToken, thenToken, elseToken));
+
+                    if (currentPhase != GamePhase.Running)
+                    {
+                        yield break;
+                    }
                 }
 
                 // Check victory after player pipeline completes
@@ -243,6 +250,79 @@ namespace CodeForge.Combat
             else if (DefeatModalUI.Instance != null)
             {
                 DefeatModalUI.Instance.Show();
+            }
+        }
+
+        private IEnumerator ExecutePlayerTurnSafeguarded(
+            CombatContext context,
+            CodeEditorPanelUI editorUI,
+            TargetingTokenSO targetToken,
+            ConditionTokenSO condToken,
+            ActionTokenSO thenToken,
+            ActionTokenSO elseToken)
+        {
+            float startTime = Time.time;
+            const float timeoutSeconds = 3.0f;
+            const int maxSteps = 25;
+            int stepCount = 0;
+
+            bool isCompleted = false;
+            IEnumerator pipeline = player.ExecuteTurnPipeline(context, editorUI, targetToken, condToken, thenToken, elseToken);
+
+            while (!isCompleted)
+            {
+                if (Time.time - startTime > timeoutSeconds || stepCount > maxSteps)
+                {
+                    ConsoleLogUI.Log("<color=#FF4444>[Error] Runtime Exception: Potential infinite loop or evaluation timeout detected.</color>");
+                    TriggerRuntimeError("Execution halted to prevent application freeze. Potential circular call or infinite loop in PlayerCombat.cs.");
+                    yield break;
+                }
+
+                stepCount++;
+                bool hasNext = false;
+                try
+                {
+                    hasNext = pipeline.MoveNext();
+                }
+                catch (System.Exception ex)
+                {
+                    ConsoleLogUI.Log($"<color=#FF4444>[Error] Runtime Exception: {ex.Message}</color>");
+                    TriggerRuntimeError($"Execution halted due to unhandled runtime exception: {ex.Message}");
+                    yield break;
+                }
+
+                if (!hasNext)
+                {
+                    isCompleted = true;
+                    break;
+                }
+
+                yield return pipeline.Current;
+            }
+        }
+
+        public void TriggerRuntimeError(string errorMessage)
+        {
+            if (combatCoroutine != null)
+            {
+                StopCoroutine(combatCoroutine);
+                combatCoroutine = null;
+            }
+
+            SetPhase(GamePhase.Defeat);
+            if (codeEditorUI != null)
+            {
+                codeEditorUI.ResetAllHighlights();
+                codeEditorUI.SetInteractionLocked(false);
+            }
+
+            if (defeatModalUI != null)
+            {
+                defeatModalUI.ShowRuntimeError(errorMessage);
+            }
+            else if (DefeatModalUI.Instance != null)
+            {
+                DefeatModalUI.Instance.ShowRuntimeError(errorMessage);
             }
         }
 

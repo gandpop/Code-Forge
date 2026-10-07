@@ -1,97 +1,90 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v30.0)
-## Project: CodeForge — Universal Text & Typography Editability in Editor & Inspector
+# ARCHITECTURAL PLAN & SPECIFICATION (v35.0)
+## Project: CodeForge — Zero-Tofu Font Polish & Frictionless Room 1 Onboarding
 
 ---
 
-## 1. Executive Summary & Problem Diagnosis
+## 1. Executive Summary & Root Cause Analysis
 
-### 1.1 Root Cause: User Blocked From Editing Text in Unity Editor
-The user explicitly requested:
-> *"I also wanna be able to edit all text which i cant. Make the prompt"*
+### 1.1 Root Cause 1: Unicode Emojis & Symbols Rendering as Missing Glyph Squares ("Tofu")
+Unity TextMeshPro font assets (`LiberationSans SDF` and `BoldPixels_SDF`) only contain standard ASCII characters. When scripts attempt to render Unicode emojis (such as `🔒`, `🗑️`, `⚠️`, `🔄`, `📋`, `⏸`, `✕`, and bullets `•`), TextMeshPro cannot find the glyphs and substitutes Unicode character `\u25A1` (white rectangle square `□`), flooding the Unity Console with missing character warnings.
 
-During investigation, we identified why editing text string values and properties (font size, font, color, alignment) was completely blocked:
-1. **Continuous Edit-Mode Overwrite Loops (`Update()` in Edit Mode):**
-   In `PlayerHealthPlateUI.cs`, an `#if UNITY_EDITOR Update()` method runs at 60 FPS in Edit Mode, constantly calling `RefreshDisplay()` and `EnsureFont()`. This forcibly overwrote `hpText.text = $"<size=115%><b>PLAYER</b></size> 20/20 HP"` and `hpText.fontSize = 18f;` every frame (every 16ms). Any text typed or property adjusted by the user in the Inspector was instantly erased.
-2. **Aggressive `[ExecuteAlways]` Component Resets:**
-   In `ConsoleLogUI.cs`, `SetupConsoleHierarchy()` was overwriting `headerText.text`, `headerText.fontSize`, `headerText.font`, `logTextDisplay.fontSize`, `lineSpacing`, and `margin`.
-3. **Prefab & Entity Overwrites:**
-   In `EnemyHealthBarUI.cs` and `EnemyEntity.cs`, `nameAndHpText` and `IntentText` were having their fonts, alignments, and text strings continuously overwritten by scripts.
-
----
-
-### 1.2 The Architecture Fix: Universal Designer Freedom (Inspector-First)
-To make **ALL text editable** by the user in the Unity Editor:
-1. **Kill Continuous Edit-Mode Text Overwrites:**
-   - Remove the edit-mode `Update()` loop from `PlayerHealthPlateUI.cs`. Text content updates (`hpText.text = ...`) must **only** occur during runtime (`Application.isPlaying`) when health or shield actually changes.
-   - In Edit Mode, text typed by the designer in the Inspector must remain untouched and persistent.
-2. **Preserve Designer Text Strings:**
-   - For `ConsoleHeader`: never overwrite `headerText.text` if the user has written a custom header string.
-   - For `HPText`: preserve whatever text string or preview the designer sets in the Inspector during edit mode.
-   - For `Label` in `EnemyPrefab.prefab`: allow the designer to set whatever placeholder text and styling they prefer.
-3. **Preserve Designer Typography Properties:**
-   - Scripts must **never** hardcode `fontSize`, `font`, `alignment`, `color`, `margins`, or `lineSpacing` on existing TextMeshPro components.
-   - Scripts only supply safe defaults when a component is created from scratch (e.g. `if (tmp.fontSize <= 0f)`).
-4. **Battle Console Font Reversion:**
-   - Revert `ConsoleHeader` and `LogTextDisplay` back to standard Unity default font (`LiberationSans SDF`).
+### 1.2 Root Cause 2: Room 1 Validation Friction (`Attack.damage` unassigned)
+To reduce cognitive overload for new players, the `Attack()` method is folded by default in Room 1. However, `ValidatePreBattle()` requires `attackDamageSocket` to have a token assigned. If it is empty, compiling fails with:
+`[Compiler Error] PlayerCombat.cs: Use of unassigned variable 'Attack.damage'. Please assign a token before compiling!`
+Since `Attack()` is collapsed, a new player does not realize they need to expand `Attack()` and slot a number before they can even play Room 1.
+**The Fix:** Pre-slot the starter damage token (`Int_8`, 8 DMG) into `attackDamageSocket` in `PrePopulateDefaultTokens()`. In Room 1, the player only needs to drag `Attack(target);` into `ExecuteTurn()`, creating a smooth, intuitive "Hello World" onboarding experience.
 
 ---
 
 ## 2. Technical Specifications & File Edits
 
-### 2.1 `Assets/Scripts/UI/PlayerHealthPlateUI.cs`
-- **Remove Edit-Mode `Update()` Loop:**
-  - Delete lines 240–250 (`#if UNITY_EDITOR private void Update() { ... } #endif`). This stops the 60 FPS edit-mode loop that wiped out user typing and font size tweaks.
-- **In `EnsureFont()`:**
-  - Do NOT hardcode `hpText.fontSize = 18f;` (or line 132 `hpText.fontSize = 20f;`).
-  - Only assign `hpText.font = pixelFont;` if `hpText.font == null`.
-- **In `RefreshDisplay()`:**
-  - When in edit mode (`!Application.isPlaying`), do NOT overwrite `hpText.text`. Allow the designer to type any preview or label text in the Inspector.
-  - When in play mode (`Application.isPlaying`), update `hpText.text` dynamically based on current HP/Shield without altering the component's font size or styling.
+### 2.1 Complete Unicode / Emoji Stripping (Pure ASCII Typography)
 
-### 2.2 `Assets/Scripts/UI/ConsoleLogUI.cs`
-- **Remove `pixelFont` & Revert to Old Font:**
-  - Remove `[SerializeField] private TMP_FontAsset pixelFont;` and the `#if UNITY_EDITOR` block loading `BoldPixels_SDF.asset`.
-  - Revert `headerText.font` and `logTextDisplay.font` to `TMPro.TMP_Settings.defaultFontAsset` (`LiberationSans SDF`).
-- **Make Text Content & Properties Editable:**
-  - In `SetupConsoleHierarchy()`:
-    - Only assign default `headerText.text` if `string.IsNullOrEmpty(headerText.text)`. Never overwrite existing text typed by the user.
-    - Only set default `headerText.fontSize = 14f;` if `headerText.fontSize <= 0f`.
-    - Only set default `logTextDisplay.fontSize = 14.5f;` if `logTextDisplay.fontSize <= 0f`.
-    - Only set default `logTextDisplay.lineSpacing = 4f;` if `logTextDisplay.lineSpacing == 0f`.
-    - Do NOT hardcode or reset `logTextDisplay.margin` if already configured in the Inspector.
+Replace all non-ASCII symbols with clean, authentic IDE programming typography:
 
-### 2.3 `Assets/Scripts/UI/EnemyHealthBarUI.cs`
-- In `EnsureFontAndFill()`:
-  - Only assign `nameAndHpText.font = pixelFont` if `nameAndHpText.font == null`.
-  - Do NOT overwrite `nameAndHpText.fontSize`, `alignment`, or `textWrappingMode` in code.
-- In `RefreshDisplay()`:
-  - If `!Application.isPlaying`, do NOT overwrite `nameAndHpText.text` so the designer can freely edit and preview enemy health text in `EnemyPrefab.prefab`.
-  - Maintain right-to-left health bar fill setup:
-    `fillImage.sprite = PlayerHealthPlateUI.GetOrCreateSquareSprite();`
-    `fillImage.type = Image.Type.Filled;`
-    `fillMethod = Image.FillMethod.Horizontal;`
-    `fillOrigin = (int)Image.OriginHorizontal.Left;`
+1. **`Assets/Scripts/UI/EditorLineRowUI.cs` (Locked Method Rows):**
+   - Replace `🔒 [{reasonTag}]` with:
+     ```csharp
+     codeTmp.text = $"<color=#E5C07B>[LOCKED: {reasonTag}]</color>  <color=#569CD6>{cleanCode}</color> <color=#5C6370>{{ ... }}</color>";
+     ```
 
-### 2.4 `Assets/Scripts/Combat/EnemyEntity.cs`
-- In `EnsureIntentPlateUI()`:
-  - Only assign `tmp.fontSize = 12f;` and initial font when creating `IntentText` for the first time.
-  - If `IntentText` already exists on the prefab or canvas, **do not** overwrite its `text`, `fontSize`, `alignment`, or `font`.
+2. **`Assets/Scripts/UI/ShelfDiscardSlotUI.cs` (Trash Box):**
+   - Replace `🗑️` and `✕` with:
+     ```csharp
+     promptText.text = "<b>DISCARD</b>\n<color=#E06C75><b>[ X ]</b></color>\n<size=75%><color=#858585>Drop token here</color></size>";
+     ```
+
+3. **`Assets/Scripts/UI/DiscardConfirmationModalUI.cs` (Confirm Modal):**
+   - Replace `🗑️ CONFIRM TOKEN DISCARD` with:
+     ```csharp
+     headerText.text = "<color=#E06C75><b>CONFIRM TOKEN DISCARD</b></color>";
+     ```
+
+4. **`Assets/Scripts/UI/RewardPanelUI.cs` (Reward Screen):**
+   - In unspent choice modal: Replace `⚠️ UNSPENT REWARD CHOICES` with:
+     `headTmp.text = "<color=#FFCC00><b>[!] UNSPENT REWARD CHOICES</b></color>";`
+   - In build peek: Replace `📋 Current Build & Shelf` with:
+     `sb.AppendLine("<color=#61AFEF><b>// Current Build & Shelf</b></color>");`
+   - Replace bullet points `•` with standard ASCII dashes `-`.
+
+5. **`Assets/Scripts/UI/DefeatModalUI.cs` (Runtime Error Modal):**
+   - Replace `⚠️ RUNTIME ERROR` with:
+     `headerText.text = "<color=#FFCC00>[!] RUNTIME ERROR: EXECUTION TIMEOUT</color>";`
+   - Replace `🔄 Retry Room` with:
+     `txt.text = "Retry Room";`
+
+6. **`Assets/Scripts/UI/DebuggerLocalsUI.cs` (Breakpoint Title):**
+   - Replace `⏸ PAUSED AT BREAKPOINT` with:
+     `titleText.text = $"<color=#E5C07B>[PAUSED AT BREAKPOINT]</color> <color=#858585>|</color> Line {line:D2}";`
+
+7. **`Assets/Scripts/UI/DraggableTokenCardUI.cs` & `CodeEditorPanelUI.cs`:**
+   - Replace bullet `•` with vertical bar `|` or dash `-`:
+     `cardText.text = $"<size=85%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color> | <color={typeColor}><b>{typeName}</b></color></size>\n...";`
+   - In shelf header: Replace `•` with `-`:
+     `shelfHeaderText.text = "// Token Inventory Shelf (Click to inspect - Drag to socket)";`
+
+---
+
+### 2.2 Frictionless Room 1 Onboarding Pre-Population
+
+In `Assets/Scripts/UI/CodeEditorPanelUI.cs`:
+- In `PrePopulateDefaultTokens()`:
+  - Pre-slot `defaultAttackDamage` (or `Int_8`) into `attackDamageSocket` if empty:
+    ```csharp
+    public void PrePopulateDefaultTokens()
+    {
+        SlotDefaultIfEmpty(MaxHealthSocketUI, defaultMaxHealth);
+        SlotDefaultIfEmpty(attackDamageSocket, defaultAttackDamage);
+    }
+    ```
+  - Ensure `defaultAttackDamage` is referenced or loaded from `Int_8`.
+  - When the player starts Room 1, `maxHealth` (20 HP) and `Attack.damage` (8 DMG) are already configured. The player's single task is dragging `Attack(target);` into `ExecuteTurn()` and clicking "Compile & Battle", guaranteeing a seamless first win.
 
 ---
 
 ## 3. Verification & Acceptance Checklist
 
-- [x] **All Text Content Editable in Inspector:**
-  - User can select `ConsoleHeader` and edit the text string without it being reset.
-  - User can select `HPText` and edit the text string without it being wiped out by an edit-mode `Update()` loop.
-  - User can select `EnemyPrefab -> Label` and edit the text string without script overwrite.
-- [x] **All Text Properties Editable in Inspector:**
-  - User can adjust `fontSize`, `font`, `color`, `alignment`, `lineSpacing`, and `margins` on any text object, and the values persist cleanly.
-- [x] **Battle Console Reverted:**
-  - `ConsoleLogUI` uses TextMeshPro's default font (`LiberationSans SDF`) matching the Unity IDE console.
-- [x] **In-Arena Typography Intact:**
-  - Player HP, Enemy HP, and Intent Plates default to `BoldPixels_SDF` but respect designer modifications.
-- [x] **Right-to-Left Enemy Health Bar:**
-  - Decreases from right to left upon taking damage.
-- [x] **Golem Grounded:**
-  - Golem stays solid during charge turns without Perlin jitter.
+- [ ] **Zero Missing Glyph Warnings:** Unity console produces 0 `The character with Unicode value was not found` warnings.
+- [ ] **No Square Boxes / Tofu:** All locked headers, buttons, trash cards, and modals render crisp text without square symbols.
+- [ ] **Room 1 Flow:** New game in Room 1 has 8 DMG pre-slotted in `Attack.damage`; slotting `Attack(target);` into `ExecuteTurn()` compiles and clears Room 1 with zero errors.
+- [ ] **Token Discard Confirmation:** Discard confirmation modal displays clean text without missing glyphs.

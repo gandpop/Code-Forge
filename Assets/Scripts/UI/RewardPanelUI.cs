@@ -67,6 +67,7 @@ namespace CodeForge.UI
         public void Hide()
         {
             isConfirming = false;
+            if (warningDialogObj != null) warningDialogObj.SetActive(false);
             if (rootContainer != null && rootContainer != gameObject)
             {
                 rootContainer.SetActive(false);
@@ -164,6 +165,7 @@ namespace CodeForge.UI
 
             EnsureConfirmButton();
             EnsureContainerLayout();
+            UpdateBuildPeekDisplay();
 
             if (rewardButtonsContainer != null)
             {
@@ -390,6 +392,19 @@ namespace CodeForge.UI
                 return;
             }
 
+            if (selectedTokens.Count < maxSelectableRewards)
+            {
+                int remaining = maxSelectableRewards - selectedTokens.Count;
+                ShowUnspentRewardWarning(remaining);
+                return;
+            }
+
+            ProceedDraftSelection();
+        }
+
+        public void ProceedDraftSelection()
+        {
+            if (warningDialogObj != null) warningDialogObj.SetActive(false);
             isConfirming = true;
 
             var tokensToDraft = new List<CodeTokenSO>(selectedTokens);
@@ -414,6 +429,238 @@ namespace CodeForge.UI
             if (CombatManager.Instance != null) CombatManager.Instance.AdvanceToNextRoom();
         }
 
+        private GameObject warningDialogObj;
+        private TextMeshProUGUI warningMessageText;
+
+        public void ShowUnspentRewardWarning(int remaining)
+        {
+            if (warningDialogObj == null)
+            {
+                GameObject dlg = new GameObject("RewardWarningDialog", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+                dlg.transform.SetParent(transform, false);
+
+                var rt = dlg.GetComponent<RectTransform>();
+                rt.anchorMin = new Vector2(0.26f, 0.32f);
+                rt.anchorMax = new Vector2(0.74f, 0.68f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+
+                var img = dlg.GetComponent<Image>();
+                img.color = new Color(0.12f, 0.12f, 0.16f, 0.98f);
+
+                var outline = dlg.GetComponent<Outline>();
+                outline.effectColor = new Color(0.90f, 0.75f, 0.30f, 0.95f);
+                outline.effectDistance = new Vector2(3f, -3f);
+
+                GameObject headObj = new GameObject("Header", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                headObj.transform.SetParent(dlg.transform, false);
+                var headRt = headObj.GetComponent<RectTransform>();
+                headRt.anchorMin = new Vector2(0.05f, 0.68f);
+                headRt.anchorMax = new Vector2(0.95f, 0.92f);
+                headRt.offsetMin = Vector2.zero;
+                headRt.offsetMax = Vector2.zero;
+                var headTmp = headObj.GetComponent<TextMeshProUGUI>();
+                headTmp.text = "<color=#FFCC00><b>[!] UNSPENT REWARD CHOICES</b></color>";
+                headTmp.fontSize = 17f;
+                headTmp.fontStyle = FontStyles.Bold;
+                headTmp.alignment = TextAlignmentOptions.Center;
+
+                GameObject msgObj = new GameObject("Message", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                msgObj.transform.SetParent(dlg.transform, false);
+                var msgRt = msgObj.GetComponent<RectTransform>();
+                msgRt.anchorMin = new Vector2(0.06f, 0.36f);
+                msgRt.anchorMax = new Vector2(0.94f, 0.66f);
+                msgRt.offsetMin = Vector2.zero;
+                msgRt.offsetMax = Vector2.zero;
+                warningMessageText = msgObj.GetComponent<TextMeshProUGUI>();
+                warningMessageText.fontSize = 13.5f;
+                warningMessageText.alignment = TextAlignmentOptions.Center;
+
+                GameObject btnDraftObj = new GameObject("DraftMoreButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+                btnDraftObj.transform.SetParent(dlg.transform, false);
+                var bdRt = btnDraftObj.GetComponent<RectTransform>();
+                bdRt.anchorMin = new Vector2(0.10f, 0.10f);
+                bdRt.anchorMax = new Vector2(0.46f, 0.30f);
+                bdRt.offsetMin = Vector2.zero;
+                bdRt.offsetMax = Vector2.zero;
+                btnDraftObj.GetComponent<Image>().color = new Color(0.20f, 0.38f, 0.58f, 1f);
+                var btnDraft = btnDraftObj.GetComponent<Button>();
+                btnDraft.onClick.AddListener(() =>
+                {
+                    dlg.SetActive(false);
+                });
+
+                GameObject bdTxtObj = new GameObject("Txt", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                bdTxtObj.transform.SetParent(btnDraftObj.transform, false);
+                var bdtRt = bdTxtObj.GetComponent<RectTransform>();
+                bdtRt.anchorMin = Vector2.zero;
+                bdtRt.anchorMax = Vector2.one;
+                bdtRt.offsetMin = Vector2.zero;
+                bdtRt.offsetMax = Vector2.zero;
+                var bdtTmp = bdTxtObj.GetComponent<TextMeshProUGUI>();
+                bdtTmp.text = "Draft More";
+                bdtTmp.fontSize = 13f;
+                bdtTmp.fontStyle = FontStyles.Bold;
+                bdtTmp.alignment = TextAlignmentOptions.Center;
+
+                GameObject btnConfirmObj = new GameObject("ConfirmAnywayButton", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Button));
+                btnConfirmObj.transform.SetParent(dlg.transform, false);
+                var bcRt = btnConfirmObj.GetComponent<RectTransform>();
+                bcRt.anchorMin = new Vector2(0.54f, 0.10f);
+                bcRt.anchorMax = new Vector2(0.90f, 0.30f);
+                bcRt.offsetMin = Vector2.zero;
+                bcRt.offsetMax = Vector2.zero;
+                btnConfirmObj.GetComponent<Image>().color = new Color(0.55f, 0.32f, 0.20f, 1f);
+                var btnConfirm = btnConfirmObj.GetComponent<Button>();
+                btnConfirm.onClick.AddListener(() =>
+                {
+                    dlg.SetActive(false);
+                    ProceedDraftSelection();
+                });
+
+                GameObject bcTxtObj = new GameObject("Txt", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+                bcTxtObj.transform.SetParent(btnConfirmObj.transform, false);
+                var bctRt = bcTxtObj.GetComponent<RectTransform>();
+                bctRt.anchorMin = Vector2.zero;
+                bctRt.anchorMax = Vector2.one;
+                bctRt.offsetMin = Vector2.zero;
+                bctRt.offsetMax = Vector2.zero;
+                var bctTmp = bcTxtObj.GetComponent<TextMeshProUGUI>();
+                bctTmp.text = "Confirm Anyway";
+                bctTmp.fontSize = 13f;
+                bctTmp.fontStyle = FontStyles.Bold;
+                bctTmp.alignment = TextAlignmentOptions.Center;
+
+                warningDialogObj = dlg;
+            }
+
+            if (warningMessageText != null)
+            {
+                warningMessageText.text = $"You still have <color=#FFD700><b>{remaining}</b></color> reward choice(s) left!\nAre you sure you want to finish drafting?";
+            }
+
+            warningDialogObj.SetActive(true);
+            warningDialogObj.transform.SetAsLastSibling();
+        }
+
+        [Header("Build Peek View")]
+        [SerializeField] private GameObject buildPeekPanelObj;
+        [SerializeField] private TextMeshProUGUI buildPeekText;
+
+        public void EnsureBuildPeekPanel()
+        {
+            if (buildPeekPanelObj != null && buildPeekText != null) return;
+
+            Transform existing = transform.Find("BuildPeekPanel");
+            if (existing != null)
+            {
+                buildPeekPanelObj = existing.gameObject;
+                buildPeekText = existing.GetComponentInChildren<TextMeshProUGUI>();
+                return;
+            }
+
+            GameObject panelObj = new GameObject("BuildPeekPanel", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(Outline));
+            panelObj.transform.SetParent(transform, false);
+
+            var rt = panelObj.GetComponent<RectTransform>();
+            rt.anchorMin = new Vector2(0.68f, 0.17f);
+            rt.anchorMax = new Vector2(0.96f, 0.88f);
+            rt.offsetMin = Vector2.zero;
+            rt.offsetMax = Vector2.zero;
+
+            var img = panelObj.GetComponent<Image>();
+            img.color = new Color(0.10f, 0.12f, 0.16f, 0.96f);
+
+            var outline = panelObj.GetComponent<Outline>();
+            outline.effectColor = new Color(0.25f, 0.30f, 0.38f, 0.8f);
+            outline.effectDistance = new Vector2(2f, -2f);
+
+            GameObject textObj = new GameObject("PeekText", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+            textObj.transform.SetParent(panelObj.transform, false);
+            var textRt = textObj.GetComponent<RectTransform>();
+            textRt.anchorMin = new Vector2(0.06f, 0.04f);
+            textRt.anchorMax = new Vector2(0.94f, 0.96f);
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
+
+            buildPeekText = textObj.GetComponent<TextMeshProUGUI>();
+            buildPeekText.fontSize = 11.5f;
+            buildPeekText.color = new Color(0.85f, 0.88f, 0.92f, 1f);
+            buildPeekText.richText = true;
+            buildPeekText.alignment = TextAlignmentOptions.TopLeft;
+
+            buildPeekPanelObj = panelObj;
+        }
+
+        public void UpdateBuildPeekDisplay()
+        {
+            EnsureBuildPeekPanel();
+            if (buildPeekText == null) return;
+
+            if (codeEditorUI == null)
+            {
+                codeEditorUI = FindFirstObjectByType<CodeEditorPanelUI>(FindObjectsInactive.Include);
+            }
+
+            System.Text.StringBuilder sb = new System.Text.StringBuilder();
+            sb.AppendLine("<color=#61AFEF><b>// Current Build & Shelf</b></color>");
+            sb.AppendLine("<size=40%> </size>");
+            sb.AppendLine("<color=#E5C07B><b>Equipped Sockets:</b></color>");
+
+            if (codeEditorUI != null)
+            {
+                string maxHp = codeEditorUI.MaxHealthSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "20 HP";
+                string target = codeEditorUI.TargetSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "Closest()";
+                string cond = codeEditorUI.ConditionSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "true";
+                string thenAct = codeEditorUI.ThenActionSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "Attack()";
+                string elseAct = codeEditorUI.ElseActionSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "Attack()";
+                string defend = codeEditorUI.DefendShieldSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "Shield(5)";
+                string reaction = codeEditorUI.ReactionActionSocketUI?.AssignedToken?.GetFormattedCodeString() ?? "None";
+
+                sb.AppendLine($"- <color=#ABB2BF>Max HP:</color> <color=#98C379>{maxHp}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>Target:</color> <color=#C586C0>{target}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>Condition:</color> <color=#61AFEF>{cond}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>If True:</color> <color=#DCDCAA>{thenAct}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>Else:</color> <color=#DCDCAA>{elseAct}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>Defend:</color> <color=#4EC9B0>{defend}</color>");
+                sb.AppendLine($"- <color=#ABB2BF>Reaction:</color> <color=#E06C75>{reaction}</color>");
+                sb.AppendLine("<size=40%> </size>");
+
+                var shelfTokens = new List<string>();
+                var cards = codeEditorUI.GetComponentsInChildren<DraggableTokenCardUI>(true);
+                foreach (var c in cards)
+                {
+                    if (c != null && c.Token != null && c.transform.parent != null && c.transform.parent.name.Contains("Content"))
+                    {
+                        shelfTokens.Add(c.Token.tokenName);
+                    }
+                }
+
+                sb.AppendLine($"<color=#98C379><b>Shelf Inventory ({shelfTokens.Count}):</b></color>");
+                if (shelfTokens.Count == 0)
+                {
+                    sb.AppendLine("<color=#5C6370><i>(Shelf is currently empty)</i></color>");
+                }
+                else
+                {
+                    for (int i = 0; i < shelfTokens.Count && i < 6; i++)
+                    {
+                        sb.AppendLine($"- <color=#ABB2BF>{shelfTokens[i]}</color>");
+                    }
+                    if (shelfTokens.Count > 6)
+                    {
+                        sb.AppendLine($"<color=#5C6370><i>+ {shelfTokens.Count - 6} more...</i></color>");
+                    }
+                }
+            }
+            else
+            {
+                sb.AppendLine("<color=#5C6370><i>No editor data found</i></color>");
+            }
+
+            buildPeekText.text = sb.ToString();
+        }
+
         public void EnsureConfirmButton()
         {
             if (confirmRewardsButton == null)
@@ -431,8 +678,8 @@ namespace CodeForge.UI
                     btnObj.transform.SetParent(transform, false);
 
                     var rect = btnObj.GetComponent<RectTransform>();
-                    rect.anchorMin = new Vector2(0.32f, 0.04f);
-                    rect.anchorMax = new Vector2(0.68f, 0.14f);
+                    rect.anchorMin = new Vector2(0.20f, 0.04f);
+                    rect.anchorMax = new Vector2(0.50f, 0.14f);
                     rect.sizeDelta = Vector2.zero;
                     rect.anchoredPosition = Vector2.zero;
 
@@ -488,8 +735,8 @@ namespace CodeForge.UI
             var modalRect = GetComponent<RectTransform>();
             if (modalRect != null)
             {
-                modalRect.anchorMin = new Vector2(0.12f, 0.16f);
-                modalRect.anchorMax = new Vector2(0.88f, 0.84f);
+                modalRect.anchorMin = new Vector2(0.10f, 0.14f);
+                modalRect.anchorMax = new Vector2(0.90f, 0.86f);
                 modalRect.sizeDelta = Vector2.zero;
                 modalRect.anchoredPosition = Vector2.zero;
             }
@@ -498,7 +745,7 @@ namespace CodeForge.UI
             if (containerRect != null)
             {
                 containerRect.anchorMin = new Vector2(0.04f, 0.17f);
-                containerRect.anchorMax = new Vector2(0.96f, 0.88f);
+                containerRect.anchorMax = new Vector2(0.66f, 0.88f);
                 containerRect.sizeDelta = Vector2.zero;
                 containerRect.anchoredPosition = Vector2.zero;
             }
@@ -510,8 +757,8 @@ namespace CodeForge.UI
             var glg = rewardButtonsContainer.GetComponent<GridLayoutGroup>();
             if (glg == null) glg = rewardButtonsContainer.gameObject.AddComponent<GridLayoutGroup>();
 
-            glg.cellSize = new Vector2(230f, 96f);
-            glg.spacing = new Vector2(16f, 14f);
+            glg.cellSize = new Vector2(200f, 96f);
+            glg.spacing = new Vector2(14f, 14f);
             glg.startCorner = GridLayoutGroup.Corner.UpperLeft;
             glg.startAxis = GridLayoutGroup.Axis.Horizontal;
             glg.childAlignment = TextAnchor.MiddleCenter;

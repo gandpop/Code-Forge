@@ -18,6 +18,11 @@ namespace CodeForge.UI
         [SerializeField] private System.Collections.Generic.List<EditorLineRowUI> childRows = new System.Collections.Generic.List<EditorLineRowUI>();
         public bool isFolded = false;
 
+        [Header("Method Locking")]
+        public bool isLocked { get; private set; } = false;
+        public string lockReason { get; private set; } = "";
+        [SerializeField] private string originalLineText;
+
         public System.Collections.Generic.List<EditorLineRowUI> ChildRows => childRows;
         public Button FoldToggleButton => foldToggleButton;
         public TextMeshProUGUI FoldToggleText => foldToggleText;
@@ -85,11 +90,13 @@ namespace CodeForge.UI
 
         public void ToggleFold()
         {
+            if (isLocked) return;
             SetFolded(!isFolded);
         }
 
         public void SetFolded(bool fold)
         {
+            if (isLocked && !fold) return; // Physically cannot unfold if locked
             isFolded = fold;
             if (childRows != null)
             {
@@ -102,6 +109,86 @@ namespace CodeForge.UI
                 }
             }
             UpdateFoldDisplay();
+
+            if (transform.parent != null)
+            {
+                LayoutRebuilder.ForceRebuildLayoutImmediate(transform.parent as RectTransform);
+            }
+        }
+
+        public void SetLocked(bool locked, string reason)
+        {
+            isLocked = locked;
+            lockReason = reason;
+
+            // Find primary code text component on this row
+            TextMeshProUGUI codeTmp = null;
+            Transform codeTr = transform.Find("CodeText");
+            if (codeTr != null) codeTmp = codeTr.GetComponent<TextMeshProUGUI>();
+            if (codeTmp == null)
+            {
+                var tmps = GetComponentsInChildren<TextMeshProUGUI>(true);
+                foreach (var t in tmps)
+                {
+                    if (t != lineNumberText && t != foldToggleText && (foldToggleButton == null || !t.transform.IsChildOf(foldToggleButton.transform)))
+                    {
+                        codeTmp = t;
+                        break;
+                    }
+                }
+            }
+
+            if (codeTmp != null && string.IsNullOrEmpty(originalLineText))
+            {
+                originalLineText = codeTmp.text;
+            }
+
+            if (locked)
+            {
+                // Disable/hide fold button so players physically CANNOT click open the locked section
+                if (foldToggleButton != null)
+                {
+                    foldToggleButton.gameObject.SetActive(false);
+                }
+
+                // Hide all child rows and nested sockets
+                if (childRows != null)
+                {
+                    foreach (var row in childRows)
+                    {
+                        if (row != null && row != this)
+                        {
+                            row.gameObject.SetActive(false);
+                        }
+                    }
+                }
+
+                // Display locked header text: [LOCKED: Unlocks in Room X]  public void Defend() { ... }
+                if (codeTmp != null)
+                {
+                    string cleanCode = System.Text.RegularExpressions.Regex.Replace(originalLineText ?? codeTmp.text, "<.*?>", string.Empty).Trim();
+                    string reasonTag = string.IsNullOrEmpty(reason) ? "LOCKED" : (reason.StartsWith("Locked:") || reason.StartsWith("LOCKED:") ? reason : $"LOCKED: {reason}");
+                    codeTmp.text = $"<color=#E5C07B>[{reasonTag.ToUpper()}]</color>  <color=#569CD6>{cleanCode}</color> <color=#5C6370>{{ ... }}</color>";
+                }
+            }
+            else
+            {
+                // Restore original text
+                if (codeTmp != null && !string.IsNullOrEmpty(originalLineText))
+                {
+                    codeTmp.text = originalLineText;
+                }
+
+                // Re-enable standard fold toggle [-] and expand method
+                if (foldToggleButton != null)
+                {
+                    foldToggleButton.gameObject.SetActive(true);
+                }
+
+                SetFolded(false);
+            }
+
+            FormatRow();
 
             if (transform.parent != null)
             {

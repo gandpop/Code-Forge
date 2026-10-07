@@ -209,6 +209,40 @@ namespace CodeForge.UI
         {
             gameObject.SetActive(true);
             BuildUIHierarchyIfNeeded();
+            if (headerText != null)
+            {
+                headerText.text = "<color=#FF5454>SYSTEM CRASH: EXECUTION TERMINATED</color>";
+            }
+            if (bodyText != null)
+            {
+                bodyText.text = "Player health reached 0 HP.\nPipeline execution halted due to fatal exception.";
+            }
+            if (retryButton != null)
+            {
+                var txt = retryButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (txt != null) txt.text = "Retry Room";
+            }
+            if (rootContainer != null) rootContainer.SetActive(true);
+            transform.SetAsLastSibling();
+        }
+
+        public void ShowRuntimeError(string errorMessage = null)
+        {
+            gameObject.SetActive(true);
+            BuildUIHierarchyIfNeeded();
+            if (headerText != null)
+            {
+                headerText.text = "<color=#FFCC00>[!] RUNTIME ERROR: EXECUTION TIMEOUT</color>";
+            }
+            if (bodyText != null)
+            {
+                bodyText.text = errorMessage ?? "Execution halted to prevent application freeze. Potential circular call or infinite loop in PlayerCombat.cs.";
+            }
+            if (retryButton != null)
+            {
+                var txt = retryButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (txt != null) txt.text = "Retry Room";
+            }
             if (rootContainer != null) rootContainer.SetActive(true);
             transform.SetAsLastSibling();
         }
