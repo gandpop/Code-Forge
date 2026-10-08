@@ -1,90 +1,97 @@
-# ARCHITECTURAL PLAN & SPECIFICATION (v35.0)
-## Project: CodeForge — Zero-Tofu Font Polish & Frictionless Room 1 Onboarding
+# ARCHITECTURAL PLAN & SPECIFICATION (v36.0)
+## Project: CodeForge — Robust 20-Second Global Combat Watchdog Timer (Anti-Softlock)
 
 ---
 
 ## 1. Executive Summary & Root Cause Analysis
 
-### 1.1 Root Cause 1: Unicode Emojis & Symbols Rendering as Missing Glyph Squares ("Tofu")
-Unity TextMeshPro font assets (`LiberationSans SDF` and `BoldPixels_SDF`) only contain standard ASCII characters. When scripts attempt to render Unicode emojis (such as `🔒`, `🗑️`, `⚠️`, `🔄`, `📋`, `⏸`, `✕`, and bullets `•`), TextMeshPro cannot find the glyphs and substitutes Unicode character `\u25A1` (white rectangle square `□`), flooding the Unity Console with missing character warnings.
+### 1.1 The Issue
+The user noticed during pre-build testing that the anti-softlock / infinite loop detection was not triggering when expected.
 
-### 1.2 Root Cause 2: Room 1 Validation Friction (`Attack.damage` unassigned)
-To reduce cognitive overload for new players, the `Attack()` method is folded by default in Room 1. However, `ValidatePreBattle()` requires `attackDamageSocket` to have a token assigned. If it is empty, compiling fails with:
-`[Compiler Error] PlayerCombat.cs: Use of unassigned variable 'Attack.damage'. Please assign a token before compiling!`
-Since `Attack()` is collapsed, a new player does not realize they need to expand `Attack()` and slot a number before they can even play Room 1.
-**The Fix:** Pre-slot the starter damage token (`Int_8`, 8 DMG) into `attackDamageSocket` in `PrePopulateDefaultTokens()`. In Room 1, the player only needs to drag `Attack(target);` into `ExecuteTurn()`, creating a smooth, intuitive "Hello World" onboarding experience.
+### 1.2 Root Cause Analysis
+In the previous implementation (`CombatManager.cs`):
+```csharp
+private IEnumerator ExecutePlayerTurnSafeguarded(...)
+{
+    float startTime = Time.time;
+    const float timeoutSeconds = 3.0f;
+    ...
+```
+The timeout was placed **only** inside the single-round player turn pipeline. 
+1. **Per-Round Reset:** The 3-second timer reset on every single round. If a player was trapped in an infinite combat loop or stalemate (e.g., repeating shield/heal while the enemy deals zero net damage over 50 rounds), each individual player turn took only ~0.4s. The 3.0-second timer was never breached, allowing combat to run endlessly without triggering the safeguard.
+2. **Hangs Outside the Pipeline:** If combat froze due to an animation wait, an enemy action deadlock, or an unhandled coroutine hang, `ExecutePlayerTurnSafeguarded` was not running, so the timeout could not fire.
+
+### 1.3 The Solution: 20-Second Dedicated Watchdog Coroutine
+Implement a **dedicated, independent watchdog timer coroutine** on `CombatManager` that tracks overall combat execution time:
+- When the player clicks "Compile & Battle" and enters `GamePhase.Running`, start a separate `CombatWatchdogTimer(20.0f)`.
+- If combat does not reach Victory or Defeat within **20 seconds**, the watchdog timer immediately intercepts execution.
+- It safely halts `combatCoroutine`, logs an error to the Battle Console, and opens `DefeatModalUI.ShowRuntimeError(...)` displaying the soft-lock prompt with a `[Retry Room]` button.
+- If combat finishes naturally (Victory or Defeat) before 20 seconds, the watchdog coroutine is cancelled cleanly.
 
 ---
 
 ## 2. Technical Specifications & File Edits
 
-### 2.1 Complete Unicode / Emoji Stripping (Pure ASCII Typography)
+### 2.1 `Assets/Scripts/Combat/CombatManager.cs`
 
-Replace all non-ASCII symbols with clean, authentic IDE programming typography:
+1. **Serialized Watchdog Settings & State:**
+   ```csharp
+   [Header("Anti-Softlock Safeguard")]
+   [SerializeField] private float combatTimeoutDuration = 20.0f;
+   private Coroutine watchdogCoroutine;
+   ```
 
-1. **`Assets/Scripts/UI/EditorLineRowUI.cs` (Locked Method Rows):**
-   - Replace `🔒 [{reasonTag}]` with:
+2. **Watchdog Lifecycle in `StartCombatExecution()` / `EnterPlanningPhase()` / `HandleVictory()` / `HandleDefeat()`:**
+   - In `StartCombatExecution()`:
      ```csharp
-     codeTmp.text = $"<color=#E5C07B>[LOCKED: {reasonTag}]</color>  <color=#569CD6>{cleanCode}</color> <color=#5C6370>{{ ... }}</color>";
+     StopWatchdog();
+     watchdogCoroutine = StartCoroutine(CombatWatchdogRoutine(combatTimeoutDuration));
+     ```
+   - In `EnterPlanningPhase()`, `HandleVictory()`, and `HandleDefeat()`:
+     ```csharp
+     StopWatchdog();
+     ```
+   - Helper method:
+     ```csharp
+     private void StopWatchdog()
+     {
+         if (watchdogCoroutine != null)
+         {
+             StopCoroutine(watchdogCoroutine);
+             watchdogCoroutine = null;
+         }
+     }
      ```
 
-2. **`Assets/Scripts/UI/ShelfDiscardSlotUI.cs` (Trash Box):**
-   - Replace `🗑️` and `✕` with:
-     ```csharp
-     promptText.text = "<b>DISCARD</b>\n<color=#E06C75><b>[ X ]</b></color>\n<size=75%><color=#858585>Drop token here</color></size>";
-     ```
+3. **Independent Watchdog Implementation:**
+   ```csharp
+   private IEnumerator CombatWatchdogRoutine(float timeoutSeconds)
+   {
+       yield return new WaitForSeconds(timeoutSeconds);
 
-3. **`Assets/Scripts/UI/DiscardConfirmationModalUI.cs` (Confirm Modal):**
-   - Replace `🗑️ CONFIRM TOKEN DISCARD` with:
-     ```csharp
-     headerText.text = "<color=#E06C75><b>CONFIRM TOKEN DISCARD</b></color>";
-     ```
+       if (currentPhase == GamePhase.Running)
+       {
+           ConsoleLogUI.Log($"<color=#FF4444>[Error] Runtime Exception: Combat execution exceeded {timeoutSeconds:0}s timeout (Soft-lock detected).</color>");
+           TriggerRuntimeError($"Combat execution exceeded {timeoutSeconds:0} seconds without resolving.\nExecution halted to prevent soft-lock. Click Retry Room to refactor your code.");
+       }
+   }
+   ```
 
-4. **`Assets/Scripts/UI/RewardPanelUI.cs` (Reward Screen):**
-   - In unspent choice modal: Replace `⚠️ UNSPENT REWARD CHOICES` with:
-     `headTmp.text = "<color=#FFCC00><b>[!] UNSPENT REWARD CHOICES</b></color>";`
-   - In build peek: Replace `📋 Current Build & Shelf` with:
-     `sb.AppendLine("<color=#61AFEF><b>// Current Build & Shelf</b></color>");`
-   - Replace bullet points `•` with standard ASCII dashes `-`.
-
-5. **`Assets/Scripts/UI/DefeatModalUI.cs` (Runtime Error Modal):**
-   - Replace `⚠️ RUNTIME ERROR` with:
-     `headerText.text = "<color=#FFCC00>[!] RUNTIME ERROR: EXECUTION TIMEOUT</color>";`
-   - Replace `🔄 Retry Room` with:
-     `txt.text = "Retry Room";`
-
-6. **`Assets/Scripts/UI/DebuggerLocalsUI.cs` (Breakpoint Title):**
-   - Replace `⏸ PAUSED AT BREAKPOINT` with:
-     `titleText.text = $"<color=#E5C07B>[PAUSED AT BREAKPOINT]</color> <color=#858585>|</color> Line {line:D2}";`
-
-7. **`Assets/Scripts/UI/DraggableTokenCardUI.cs` & `CodeEditorPanelUI.cs`:**
-   - Replace bullet `•` with vertical bar `|` or dash `-`:
-     `cardText.text = $"<size=85%><color={rarityHex}><b>[{Token.rarity.ToString().ToUpper()}]</b></color> | <color={typeColor}><b>{typeName}</b></color></size>\n...";`
-   - In shelf header: Replace `•` with `-`:
-     `shelfHeaderText.text = "// Token Inventory Shelf (Click to inspect - Drag to socket)";`
-
----
-
-### 2.2 Frictionless Room 1 Onboarding Pre-Population
-
-In `Assets/Scripts/UI/CodeEditorPanelUI.cs`:
-- In `PrePopulateDefaultTokens()`:
-  - Pre-slot `defaultAttackDamage` (or `Int_8`) into `attackDamageSocket` if empty:
-    ```csharp
-    public void PrePopulateDefaultTokens()
-    {
-        SlotDefaultIfEmpty(MaxHealthSocketUI, defaultMaxHealth);
-        SlotDefaultIfEmpty(attackDamageSocket, defaultAttackDamage);
-    }
-    ```
-  - Ensure `defaultAttackDamage` is referenced or loaded from `Int_8`.
-  - When the player starts Room 1, `maxHealth` (20 HP) and `Attack.damage` (8 DMG) are already configured. The player's single task is dragging `Attack(target);` into `ExecuteTurn()` and clicking "Compile & Battle", guaranteeing a seamless first win.
+4. **In `TriggerRuntimeError(string errorMessage)`:**
+   - Ensure `StopWatchdog();` is called.
+   - Halt `combatCoroutine`.
+   - Set `currentPhase = GamePhase.Defeat;`.
+   - Display `DefeatModalUI.ShowRuntimeError(errorMessage);`.
 
 ---
 
 ## 3. Verification & Acceptance Checklist
 
-- [ ] **Zero Missing Glyph Warnings:** Unity console produces 0 `The character with Unicode value was not found` warnings.
-- [ ] **No Square Boxes / Tofu:** All locked headers, buttons, trash cards, and modals render crisp text without square symbols.
-- [ ] **Room 1 Flow:** New game in Room 1 has 8 DMG pre-slotted in `Attack.damage`; slotting `Attack(target);` into `ExecuteTurn()` compiles and clears Room 1 with zero errors.
-- [ ] **Token Discard Confirmation:** Discard confirmation modal displays clean text without missing glyphs.
+- [ ] **Independent Timer:** Watchdog runs as a separate coroutine on `CombatManager`, immune to internal pipeline hangs.
+- [ ] **20-Second Trigger:** If combat continues for 20 seconds without a winner, execution halts automatically and the prompt appears.
+- [ ] **Prompt Display:** `DefeatModalUI` opens showing:
+  - Header: `[!] RUNTIME ERROR: EXECUTION TIMEOUT`
+  - Body: `Combat execution exceeded 20 seconds without resolving...`
+  - Button: `Retry Room`
+- [ ] **Retry Functionality:** Clicking `Retry Room` restores player HP to full, resets enemies in current room, and unlocks the code editor for refactoring.
+- [ ] **Clean Normal Combat:** Fast battles that finish under 20 seconds cancel the watchdog cleanly without triggering errors.

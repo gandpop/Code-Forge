@@ -37,6 +37,10 @@ namespace CodeForge.Combat
         public int CurrentRoomIndex => currentRoomIndex;
         private Coroutine combatCoroutine;
 
+        [Header("Anti-Softlock Safeguard")]
+        [SerializeField] private float combatTimeoutDuration = 20.0f;
+        private Coroutine watchdogCoroutine;
+
         private Vector3 playerInitialPos;
         private Vector3 playerInitialScale;
         private bool playerInitialCaptured = false;
@@ -75,6 +79,8 @@ namespace CodeForge.Combat
 
         public void EnterPlanningPhase()
         {
+            StopWatchdog();
+
             if (combatCoroutine != null)
             {
                 StopCoroutine(combatCoroutine);
@@ -140,7 +146,29 @@ namespace CodeForge.Combat
             SetPhase(GamePhase.Running);
             ConsoleLogUI.Log($"[System] Compiling ExecuteTurn(). Starting pipeline execution...");
 
+            StopWatchdog();
+            watchdogCoroutine = StartCoroutine(CombatWatchdogRoutine(combatTimeoutDuration));
+
             combatCoroutine = StartCoroutine(CombatLoopCoroutine());
+        }
+
+        private IEnumerator CombatWatchdogRoutine(float timeoutSeconds)
+        {
+            yield return new WaitForSeconds(timeoutSeconds);
+            if (currentPhase == GamePhase.Running)
+            {
+                ConsoleLogUI.Log($"<color=#FF4444>[Error] Runtime Exception: Combat execution exceeded {timeoutSeconds:0}s timeout (Soft-lock detected).</color>");
+                TriggerRuntimeError($"Combat execution exceeded {timeoutSeconds:0} seconds without resolving.\nExecution halted to prevent soft-lock. Click Retry Room to refactor your code.");
+            }
+        }
+
+        private void StopWatchdog()
+        {
+            if (watchdogCoroutine != null)
+            {
+                StopCoroutine(watchdogCoroutine);
+                watchdogCoroutine = null;
+            }
         }
 
         private IEnumerator CombatLoopCoroutine()
@@ -229,6 +257,7 @@ namespace CodeForge.Combat
 
         private void HandleVictory()
         {
+            StopWatchdog();
             SetPhase(GamePhase.Victory);
             if (codeEditorUI != null) codeEditorUI.ResetAllHighlights();
             ConsoleLogUI.Log($"[Success] Room {currentRoomIndex} cleared without unhandled exceptions!");
@@ -240,6 +269,7 @@ namespace CodeForge.Combat
 
         private void HandleDefeat()
         {
+            StopWatchdog();
             SetPhase(GamePhase.Defeat);
             if (codeEditorUI != null) codeEditorUI.ResetAllHighlights();
             ConsoleLogUI.Log("<color=#FF5454>[Error] Runtime Exception: Player terminated by enemy forces. Run Over.</color>");
@@ -303,6 +333,8 @@ namespace CodeForge.Combat
 
         public void TriggerRuntimeError(string errorMessage)
         {
+            StopWatchdog();
+
             if (combatCoroutine != null)
             {
                 StopCoroutine(combatCoroutine);
